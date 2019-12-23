@@ -46,9 +46,13 @@ Edit the values of your parameter in SSM Parameter Store to use the failure inje
 
 In the subfolder `example` is a simple Serverless Framework template which will install a Lambda function and a parameter in SSM Parameter Store.
 ```bash
-npm install failure-lambda
+npm i failure-lambda
 sls deploy
 ```
+
+## Notes
+
+Inspired by Yan Cui's articles on latency injection for AWS Lambda (https://hackernoon.com/chaos-engineering-and-aws-lambda-latency-injection-ddeb4ff8d983) and Adrian Hornsby's chaos injection library for Python (https://github.com/adhorn/aws-lambda-chaos-injection/).
 
 ## Changelog
 
