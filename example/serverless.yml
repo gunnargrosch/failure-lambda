@@ -1,0 +1,36 @@
+service: failureLambdaExample
+frameworkVersion: ">=1.34.0 <2.0.0"
+provider:
+  name: aws
+  runtime: nodejs10.x
+  memorySize: 128
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - ssm:GetParameters
+        - ssm:GetParameter
+      Resource: "arn:aws:ssm:${opt:region, self:provider.region}:*:parameter/${self:service}-${opt:stage, self:provider.stage}-failureLambdaExample"
+functions:
+  failureLambdaExample:
+    handler: index.handler
+    timeout: 3
+    environment:
+      FAILURE_INJECTION_PARAM:
+        Ref: failureLambdaParameter
+    events:
+      - http:
+          path: failureLambdaExample/
+          method: get
+          cors: true
+resources:
+  Resources:
+    failureLambdaParameter:
+      Type: 'AWS::SSM::Parameter'
+      Properties:
+        Name: ${self:service}-${opt:stage, self:provider.stage}-failureLambdaExample
+        Type: String
+        Value: '{"isEnabled": false, "failureMode": "latency", "rate": 1, "minLatency": 100, "maxLatency": 400, "exceptionMsg": "Exception message!", "statusCode": 404}'
+package:
+  exclude:
+    - .vscode
+    - .serverless

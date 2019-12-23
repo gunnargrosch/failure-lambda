@@ -1,0 +1,37 @@
+{
+  "name": "failure-lambda",
+  "version": "0.0.1",
+  "description": "Module for failure injection into AWS Lambda",
+  "main": "./lib/failure.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gunnargrosch/failure-lambda.git"
+  },
+  "keywords": [
+    "aws",
+    "lambda",
+    "failure",
+    "injection",
+    "chaos",
+    "chaosengineering"
+  ],
+  "author": "Gunnar Grosch",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/gunnargrosch/failure-lambda/issues"
+  },
+  "homepage": "https://github.com/gunnargrosch/failure-lambda#readme",
+  "devDependencies": {
+    "aws-sdk": "^2.595.0",
+    "eslint": "^6.8.0",
+    "eslint-config-standard": "^14.1.0",
+    "eslint-plugin-import": "^2.19.1",
+    "eslint-plugin-node": "^10.0.0",
+    "eslint-plugin-promise": "^4.2.1",
+    "eslint-plugin-standard": "^4.0.1"
+  },
+  "dependencies": {}
+}
