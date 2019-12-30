@@ -29,7 +29,7 @@ resources:
       Properties:
         Name: ${self:service}-${opt:stage, self:provider.stage}-failureLambdaExample
         Type: String
-        Value: '{"isEnabled": false, "failureMode": "latency", "rate": 1, "minLatency": 100, "maxLatency": 400, "exceptionMsg": "Exception message!", "statusCode": 404}'
+        Value: '{"isEnabled": false, "failureMode": "latency", "rate": 1, "minLatency": 100, "maxLatency": 400, "exceptionMsg": "Exception message!", "statusCode": 404, "diskSpace": 100}'
 package:
   exclude:
     - .vscode
