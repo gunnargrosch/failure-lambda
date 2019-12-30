@@ -2,7 +2,7 @@
 
 ## Description
 
-`failure-lambda` is a small Node module for injecting failure into AWS Lambda (https://aws.amazon.com/lambda). It offers a simple failure injection wrapper for your Lambda handler where you then can choose to inject failure by setting the `failureMode` to `latency`, `exception` or `statuscode`. You control your failure injection using SSM Parameter Store.
+`failure-lambda` is a small Node module for injecting failure into AWS Lambda (https://aws.amazon.com/lambda). It offers a simple failure injection wrapper for your Lambda handler where you then can choose to inject failure by setting the `failureMode` to `latency`, `exception`, `statuscode` or `diskspace`. You control your failure injection using SSM Parameter Store.
 
 ## How to install
 
@@ -22,10 +22,10 @@ exports.handler = failureLambda(async (event, context) => {
 ```
 4. Create a parameter in SSM Parameter Store.
 ```json
-{"isEnabled": false, "failureMode": "latency", "rate": 1, "minLatency": 100, "maxLatency": 400, "exceptionMsg": "Exception message!", "statusCode": 404}
+{"isEnabled": false, "failureMode": "latency", "rate": 1, "minLatency": 100, "maxLatency": 400, "exceptionMsg": "Exception message!", "statusCode": 404, "diskSpace": 100}
 ```
 ```bash
-aws ssm put-parameter --region eu-north-1 --name failureLambdaConfig --type String --overwrite --value "{\"isEnabled\": false, \"failureMode\": \"latency\", \"rate\": 1, \"minLatency\": 100, \"maxLatency\": 400, \"exceptionMsg\": \"Exception message!\", \"statusCode\": 404}"
+aws ssm put-parameter --region eu-north-1 --name failureLambdaConfig --type String --overwrite --value "{\"isEnabled\": false, \"failureMode\": \"latency\", \"rate\": 1, \"minLatency\": 100, \"maxLatency\": 400, \"exceptionMsg\": \"Exception message!\", \"statusCode\": 404, \"diskSpace\": 100}"
 ```
 5. Add an environment variable to your Lambda function with the key FAILURE_INJECTION_PARAM and the value set to the name of your parameter in SSM Parameter Store.
 6. Try it out!
@@ -41,6 +41,7 @@ Edit the values of your parameter in SSM Parameter Store to use the failure inje
 * `minLatency` and `maxLatency` is the span of latency in milliseconds injected into your function when `failureMode` is set to `latency`.
 * `exceptionMsg` is the message thrown with the exception created when `failureMode` is set to `exception`.
 * `statusCode` is the status code returned by your function when `failureMode` is set to `statuscode`.
+* `diskSpace` is size in MB of the file created in tmp when `failureMode` is set to `diskspace`.
 
 ## Example
 
@@ -55,6 +56,11 @@ sls deploy
 Inspired by Yan Cui's articles on latency injection for AWS Lambda (https://hackernoon.com/chaos-engineering-and-aws-lambda-latency-injection-ddeb4ff8d983) and Adrian Hornsby's chaos injection library for Python (https://github.com/adhorn/aws-lambda-chaos-injection/).
 
 ## Changelog
+
+### 2019-12-30 v0.1.0
+
+* Added disk space failure.
+* Updated example application to store example file in tmp.
 
 ### 2019-12-23 v0.0.1
 
