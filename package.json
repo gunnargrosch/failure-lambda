@@ -1,6 +1,6 @@
 {
   "name": "failure-lambda",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Module for failure injection into AWS Lambda",
   "main": "./lib/failure.js",
   "scripts": {

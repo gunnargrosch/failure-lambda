@@ -57,6 +57,10 @@ Inspired by Yan Cui's articles on latency injection for AWS Lambda (https://hack
 
 ## Changelog
 
+### 2020-02-13 v0.1.1
+
+* Fixed issue with exception injection not throwing the exception. Thanks to [Jason Barto](https://github.com/jpbarto)!
+
 ### 2019-12-30 v0.1.0
 
 * Added disk space failure.
