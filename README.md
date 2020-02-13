@@ -22,7 +22,7 @@ exports.handler = failureLambda(async (event, context) => {
 ```
 4. Create a parameter in SSM Parameter Store.
 ```json
-{"isEnabled": false, "failureMode": "latency", "rate": 1, "minLatency": 100, "maxLatency": 400, "exceptionMsg": "Exception message!", "statusCode": 404, "diskSpace": 100}
+{"isEnabled": false, "failureMode": "latency", "rate": 1, "catchException": false, "minLatency": 100, "maxLatency": 400, "exceptionMsg": "Exception message!", "statusCode": 404, "diskSpace": 100}
 ```
 ```bash
 aws ssm put-parameter --region eu-north-1 --name failureLambdaConfig --type String --overwrite --value "{\"isEnabled\": false, \"failureMode\": \"latency\", \"rate\": 1, \"minLatency\": 100, \"maxLatency\": 400, \"exceptionMsg\": \"Exception message!\", \"statusCode\": 404, \"diskSpace\": 100}"
@@ -38,6 +38,7 @@ Edit the values of your parameter in SSM Parameter Store to use the failure inje
 * `isEnabled: false` means that the failure injection module is disabled and no failure is injected.
 * `failureMode` selects which failure you want to inject. The options are `latency`, `exception` or `statuscode` as explained below.
 * `rate` controls the rate of failure. 1 means that failure is injected on all invocations and 0.5 that failure is injected on about half of all invocations.
+* `catchException` specifies whether to catch any thrown exceptions or to pass them through to Lambda (**default** is false)
 * `minLatency` and `maxLatency` is the span of latency in milliseconds injected into your function when `failureMode` is set to `latency`.
 * `exceptionMsg` is the message thrown with the exception created when `failureMode` is set to `exception`.
 * `statusCode` is the status code returned by your function when `failureMode` is set to `statuscode`.
@@ -56,6 +57,10 @@ sls deploy
 Inspired by Yan Cui's articles on latency injection for AWS Lambda (https://hackernoon.com/chaos-engineering-and-aws-lambda-latency-injection-ddeb4ff8d983) and Adrian Hornsby's chaos injection library for Python (https://github.com/adhorn/aws-lambda-chaos-injection/).
 
 ## Changelog
+
+### 2020-02-08 v0.1.1
+
+* Added a flag to determine whether to catch or release errors before they reach AWS Lambda
 
 ### 2019-12-30 v0.1.0
 
