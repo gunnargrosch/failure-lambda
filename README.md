@@ -22,7 +22,7 @@ exports.handler = failureLambda(async (event, context) => {
 ```
 4. Create a parameter in SSM Parameter Store.
 ```json
-{"isEnabled": false, "failureMode": "latency", "rate": 1, "minLatency": 100, "maxLatency": 400, "exceptionMsg": "Exception message!", "statusCode": 404, "diskSpace": 100}
+{"isEnabled": false, "failureMode": "latency", "rate": 1, "minLatency": 100, "maxLatency": 400, "exceptionMsg": "Exception message!", "statusCode": 404, "diskSpace": 100, "blacklist": ["s3.eu-west-1.amazonaws.com", "dynamodb.eu-west-1.amazonaws.com"]}
 ```
 ```bash
 aws ssm put-parameter --region eu-north-1 --name failureLambdaConfig --type String --overwrite --value "{\"isEnabled\": false, \"failureMode\": \"latency\", \"rate\": 1, \"minLatency\": 100, \"maxLatency\": 400, \"exceptionMsg\": \"Exception message!\", \"statusCode\": 404, \"diskSpace\": 100}"
@@ -36,12 +36,13 @@ Edit the values of your parameter in SSM Parameter Store to use the failure inje
 
 * `isEnabled: true` means that failure is injected into your Lambda function.
 * `isEnabled: false` means that the failure injection module is disabled and no failure is injected.
-* `failureMode` selects which failure you want to inject. The options are `latency`, `exception` or `statuscode` as explained below.
+* `failureMode` selects which failure you want to inject. The options are `latency`, `exception`, `blacklist` or `statuscode` as explained below.
 * `rate` controls the rate of failure. 1 means that failure is injected on all invocations and 0.5 that failure is injected on about half of all invocations.
 * `minLatency` and `maxLatency` is the span of latency in milliseconds injected into your function when `failureMode` is set to `latency`.
 * `exceptionMsg` is the message thrown with the exception created when `failureMode` is set to `exception`.
 * `statusCode` is the status code returned by your function when `failureMode` is set to `statuscode`.
 * `diskSpace` is size in MB of the file created in tmp when `failureMode` is set to `diskspace`.
+* `blacklist` is an array of regular expressions, if a connection is made to a host matching one of the regular expressions it will be blocked.
 
 ## Example
 
