@@ -9,7 +9,42 @@ provider:
       Action:
         - ssm:GetParameters
         - ssm:GetParameter
-      Resource: "arn:aws:ssm:${opt:region, self:provider.region}:*:parameter/${self:service}-${opt:stage, self:provider.stage}-failureLambdaExample"
+      Resource:
+        Fn::Join:
+          - ''
+          - - 'arn:aws:ssm:${opt:region, self:provider.region}:*:parameter/'
+            - Ref: failureLambdaParameter
+    - Effect: Allow
+      Action:
+        - s3:ListBucket
+      Resource:
+        Fn::Join:
+          - ''
+          - - 'arn:aws:s3:::'
+            - Ref: failureLambdaBucket
+    - Effect: Allow
+      Action:
+        - s3:GetObject
+        - s3:PutObject
+      Resource:
+        Fn::Join:
+          - ''
+          - - 'arn:aws:s3:::'
+            - Ref: failureLambdaBucket
+            - '/*'
+    - Effect: Allow
+      Action:
+        - dynamodb:Query
+        - dynamodb:Scan
+        - dynamodb:GetItem
+        - dynamodb:PutItem
+        - dynamodb:UpdateItem
+        - dynamodb:DeleteItem
+      Resource:
+        Fn::Join:
+          - ''
+          - - 'arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/'
+            - Ref: failureLambdaTable
 functions:
   failureLambdaExample:
     handler: index.handler
@@ -17,6 +52,10 @@ functions:
     environment:
       FAILURE_INJECTION_PARAM:
         Ref: failureLambdaParameter
+      FAILURE_INJECTION_BUCKET:
+        Ref: failureLambdaBucket
+      FAILURE_INJECTION_TABLE:
+        Ref: failureLambdaTable
     events:
       - http:
           path: failureLambdaExample/
@@ -27,9 +66,26 @@ resources:
     failureLambdaParameter:
       Type: 'AWS::SSM::Parameter'
       Properties:
-        Name: ${self:service}-${opt:stage, self:provider.stage}-failureLambdaExample
         Type: String
-        Value: '{"isEnabled": false, "failureMode": "latency", "rate": 1, "minLatency": 100, "maxLatency": 400, "exceptionMsg": "Exception message!", "statusCode": 404, "diskSpace": 100}'
+        Value: '{"isEnabled": false, "failureMode": "latency", "rate": 1, "minLatency": 100, "maxLatency": 400, "exceptionMsg": "Exception message!", "statusCode": 404, "diskSpace": 100, "blacklist": ["s3.*.amazonaws.com", "dynamodb.*.amazonaws.com"]}'
+    failureLambdaBucket:
+      Type: 'AWS::S3::Bucket'
+      Properties:
+        VersioningConfiguration:
+          Status: Suspended
+    failureLambdaTable:
+      Type: 'AWS::DynamoDB::Table'
+      DeletionPolicy: Delete
+      Properties:
+        AttributeDefinitions:
+          -
+            AttributeName: id
+            AttributeType: N
+        KeySchema:
+          -
+            AttributeName: id
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
 package:
   exclude:
     - .vscode
