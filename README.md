@@ -61,7 +61,7 @@ Inspired by Yan Cui's articles on latency injection for AWS Lambda (https://hack
 ### 2020-02-17 v0.2.0
 
 * Added blacklist failure.
-* Updated example application to retrive file from S3 based on URL from DynamoDB.
+* Updated example application to store file in S3 and item in DynamoDB.
 
 ### 2020-02-13 v0.1.1
 
