@@ -58,6 +58,10 @@ Inspired by Yan Cui's articles on latency injection for AWS Lambda (https://hack
 
 ## Changelog
 
+### 2020-10-21 v0.3.1
+
+* Change mitm mode back to connect to fix issue with all connections being blocked.
+
 ### 2020-08-24 v0.3.0
 
 * Changed mitm mode from connect to connection for quicker enable/disable of failure injection.
