@@ -87,6 +87,10 @@ Inspired by Yan Cui's articles on latency injection for AWS Lambda (https://hack
 
 ## Changelog
 
+### 2020-10-26 v0.4.1
+
+* Made AppConfig Lambda extension port configurable using environment variable.
+
 ### 2020-10-25 v0.4.0
 
 * Added optional support for AWS AppConfig, allowing to validate failure configuration, deploy configuration using gradual or non-gradual deploy strategy, monitor deployed configuration with automatical rollback if CloudWatch Alarms is configured, and caching of configuration.
