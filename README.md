@@ -90,7 +90,7 @@ Inspired by Yan Cui's articles on latency injection for AWS Lambda (https://hack
 ### 2021-03-16 v0.4.2
 
 * Puts the mitm object in the library global namespace so that it persists across function invocations.
-* Synxtax formatting.
+* Syntax formatting.
 
 ### 2020-10-26 v0.4.1
 
