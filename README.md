@@ -87,6 +87,11 @@ Inspired by Yan Cui's articles on latency injection for AWS Lambda (https://hack
 
 ## Changelog
 
+### 2021-03-16 v0.4.2
+
+* Puts the mitm object in the library global namespace so that it persists across function invocations.
+* Synxtax formatting.
+
 ### 2020-10-26 v0.4.1
 
 * Made AppConfig Lambda extension port configurable using environment variable.
