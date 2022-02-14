@@ -1,6 +1,6 @@
 {
   "name": "failure-lambda",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "description": "Module for failure injection into AWS Lambda",
   "main": "./lib/failure.js",
   "scripts": {
@@ -36,6 +36,6 @@
   },
   "dependencies": {
     "mitm": "^1.7.2",
-    "node-fetch": "^3.2.0"
+    "node-fetch": "^2.6.7"
   }
 }
