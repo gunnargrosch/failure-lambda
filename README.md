@@ -105,6 +105,10 @@ Inspired by Yan Cui's articles on latency injection for AWS Lambda (https://hack
 
 ## Changelog
 
+### 2022-02-14 v0.4.4
+
+* Switch to node-fetch@2.
+
 ### 2022-02-14 v0.4.3
 
 * Updated dependencies.
