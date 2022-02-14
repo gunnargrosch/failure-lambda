@@ -105,6 +105,10 @@ Inspired by Yan Cui's articles on latency injection for AWS Lambda (https://hack
 
 ## Changelog
 
+### 2022-02-14 v0.4.3
+
+* Updated dependencies.
+
 ### 2021-03-16 v0.4.2
 
 * Puts the mitm object in the library global namespace so that it persists across function invocations.
