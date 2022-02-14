@@ -134,3 +134,7 @@ Inspired by Yan Cui's articles on latency injection for AWS Lambda (https://hack
 **Gunnar Grosch** - [GitHub](https://github.com/gunnargrosch) | [Twitter](https://twitter.com/gunnargrosch) | [LinkedIn](https://www.linkedin.com/in/gunnargrosch/)
 
 **Jason Barto** - [GitHub](https://github.com/jpbarto) | [Twitter](https://twitter.com/Jason_Barto) | [LinkedIn](https://www.linkedin.com/in/jasonbarto)
+
+## License
+
+This code is made available under the MIT-0 license. See the LICENSE file.
