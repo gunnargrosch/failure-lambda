@@ -3,6 +3,6 @@
   "version": "0.1.0",
   "description": "",
   "dependencies": {
-    "failure-lambda": "0.4.2"
+    "failure-lambda": "0.4.3"
   }
 }
