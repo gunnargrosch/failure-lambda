@@ -75,9 +75,27 @@ Edit the values of your parameter in SSM Parameter Store or hosted configuration
 
 ## Example
 
-In the subfolder `example` is a simple Serverless Framework template which will install a Lambda function and a parameter in SSM Parameter Store.
+In the subfolder `example` is a sample application which will install an AWS Lambda function, an Amazon DynamoDB table, and a parameter in SSM Parameter Store. You can install it using AWS SAM, AWS CDK, or Serverless Framework.
+
+### AWS SAM
 ```bash
-npm i failure-lambda
+cd example/sam
+npm install
+sam build
+sam deploy --guided
+```
+
+### AWS CDK
+```bash
+cd example/cdk
+npm install
+cdk deploy
+```
+
+### Serverless Framework
+```bash
+cd example/sls
+npm install
 sls deploy
 ```
 
@@ -134,3 +152,7 @@ Inspired by Yan Cui's articles on latency injection for AWS Lambda (https://hack
 **Gunnar Grosch** - [GitHub](https://github.com/gunnargrosch) | [Twitter](https://twitter.com/gunnargrosch) | [LinkedIn](https://www.linkedin.com/in/gunnargrosch/)
 
 **Jason Barto** - [GitHub](https://github.com/jpbarto) | [Twitter](https://twitter.com/Jason_Barto) | [LinkedIn](https://www.linkedin.com/in/jasonbarto)
+
+## License
+
+This code is made available under the MIT-0 license. See the LICENSE file.
