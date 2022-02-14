@@ -1,3 +1,4 @@
+.aws-sam/
 .vs/
 .vscode/
 .serverless/
@@ -5,3 +6,4 @@ node_modules/
 example/.vscode/
 example/.serverless/
 example/node_modules/
+samconfig.toml
