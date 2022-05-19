@@ -73,6 +73,9 @@ Edit the values of your parameter in SSM Parameter Store or hosted configuration
 * `diskSpace` is size in MB of the file created in tmp when `failureMode` is set to `diskspace`.
 * `denylist` is an array of regular expressions, if a connection is made to a host matching one of the regular expressions it will be blocked.
 
+### Caching
+To enable caching, add an environment variable to your Lambda function with the key FAILURE_CACHE_TTL_SECONDS and the value set to the value to the desired cache time. The library uses node-cache for its implementation and consequently, FAILURE_CACHE_TTL_SECONDS = 0 can be used for an unlimited cache time.
+
 ## Example
 
 In the subfolder `example` is a sample application which will install an AWS Lambda function, an Amazon DynamoDB table, and a parameter in SSM Parameter Store. You can install it using AWS SAM, AWS CDK, or Serverless Framework.
@@ -104,6 +107,10 @@ sls deploy
 Inspired by Yan Cui's articles on latency injection for AWS Lambda (https://hackernoon.com/chaos-engineering-and-aws-lambda-latency-injection-ddeb4ff8d983) and Adrian Hornsby's chaos injection library for Python (https://github.com/adhorn/aws-lambda-chaos-injection/).
 
 ## Changelog
+
+### 2022-02-14 v0.4.5
+
+* Adds optional caching to the SSM configuration
 
 ### 2022-02-14 v0.4.4
 
