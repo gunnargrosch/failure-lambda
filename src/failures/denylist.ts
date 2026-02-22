@@ -34,6 +34,10 @@ export function injectDenylist(flag: FlagValue): void {
   }
 
   if (!isActive) {
+    // dns.lookup has multiple overloads: (hostname, cb), (hostname, options, cb).
+    // The options.all flag changes the callback signature to return an array,
+    // but we extract the callback generically as the last arg and pass through
+    // to the original for non-blocked hosts. AWS SDK calls don't use all: true.
     dns.lookup = function blockedLookup(
       hostname: string,
       ...args: unknown[]

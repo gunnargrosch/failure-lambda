@@ -61,7 +61,7 @@ exports.handler = failureLambda(async (event, context) => {
 
 ```ts
 import { injectFailure, getConfig, validateFlagValue, resolveFailures } from "failure-lambda";
-import type { FlagValue, FailureFlagsConfig, ResolvedFailure, FailureMode, MatchCondition } from "failure-lambda";
+import type { FlagValue, FailureFlagsConfig, ResolvedFailure, FailureMode, MatchCondition, MatchOperator } from "failure-lambda";
 
 export const handler = injectFailure(async (event, context) => {
   // your handler logic
@@ -177,7 +177,7 @@ Each condition supports an optional `operator` field (defaults to `"eq"`):
 | Operator | Description | `value` required? |
 |----------|-------------|-------------------|
 | `eq` | Exact string equality (default) | Yes |
-| `exists` | Path exists and is not null/undefined | No |
+| `exists` | Path exists and is not null/undefined (falsy values like `0`, `""`, `false` are considered to exist) | No |
 | `startsWith` | Value starts with the given prefix | Yes |
 | `regex` | Value matches the regular expression | Yes |
 

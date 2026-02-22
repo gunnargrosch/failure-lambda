@@ -1,5 +1,17 @@
 import type { MatchCondition, MatchOperator } from "./types.js";
 
+/** Cache compiled regexes to avoid recompiling on every invocation */
+const regexCache = new Map<string, RegExp>();
+
+function getCachedRegex(pattern: string): RegExp {
+  let cached = regexCache.get(pattern);
+  if (cached === undefined) {
+    cached = new RegExp(pattern);
+    regexCache.set(pattern, cached);
+  }
+  return cached;
+}
+
 /** Resolve a dot-separated path against a nested object */
 export function getNestedValue(obj: unknown, path: string): unknown {
   let current = obj;
@@ -20,7 +32,7 @@ function matchOperator(actual: unknown, operator: MatchOperator, value?: string)
       return String(actual).startsWith(value ?? "");
     case "regex":
       if (actual === null || actual === undefined) return false;
-      return new RegExp(value ?? "").test(String(actual));
+      return getCachedRegex(value ?? "").test(String(actual));
     case "eq":
     default:
       if (actual === null || actual === undefined) return false;

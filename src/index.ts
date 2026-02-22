@@ -2,7 +2,7 @@ import type { Context, Callback } from "aws-lambda";
 import type { FailureFlagsConfig, LambdaHandler, FailureLambdaOptions } from "./types.js";
 import { getConfig, resolveFailures } from "./config.js";
 import { error as logError } from "./log.js";
-import { clearDenylist } from "./failures/index.js";
+import { clearDenylist, clearDiskSpace } from "./failures/index.js";
 import { runPreHandlerInjections, runPostHandlerInjections } from "./orchestration.js";
 
 // Re-export types for consumers
@@ -70,6 +70,7 @@ function injectFailure<TEvent = unknown, TResult = unknown>(
     } catch (err) {
       logError({ action: "error", message: err instanceof Error ? err.message : String(err) });
       clearDenylist();
+      clearDiskSpace();
       throw err;
     }
   };

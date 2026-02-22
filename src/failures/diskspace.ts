@@ -1,6 +1,9 @@
 import { spawnSync } from "node:child_process";
+import { readdirSync, unlinkSync } from "node:fs";
 import type { FlagValue } from "../types.js";
-import { log, error } from "../log.js";
+import { log, warn, error } from "../log.js";
+
+const DISKSPACE_PREFIX = "diskspace-failure-";
 
 /** Fill /tmp with data using dd. Only works on Linux (Lambda runtime); not available on Windows/macOS. */
 export function injectDiskSpace(flag: FlagValue): void {
@@ -9,7 +12,7 @@ export function injectDiskSpace(flag: FlagValue): void {
 
   const result = spawnSync("dd", [
     "if=/dev/zero",
-    `of=/tmp/diskspace-failure-${Date.now()}.tmp`,
+    `of=/tmp/${DISKSPACE_PREFIX}${Date.now()}.tmp`,
     "count=1000",
     `bs=${diskSpaceMB * 1024}`,
   ]);
@@ -19,5 +22,20 @@ export function injectDiskSpace(flag: FlagValue): void {
   } else if (result.status !== 0) {
     const stderr = result.stderr?.toString().trim();
     error({ mode: "diskspace", action: "error", message: `dd exited with status ${result.status}`, stderr });
+  }
+}
+
+/** Remove diskspace failure files from /tmp. */
+export function clearDiskSpace(): void {
+  try {
+    const files = readdirSync("/tmp").filter((f) => f.startsWith(DISKSPACE_PREFIX));
+    for (const file of files) {
+      unlinkSync(`/tmp/${file}`);
+    }
+    if (files.length > 0) {
+      log({ mode: "diskspace", action: "clear", files_removed: files.length });
+    }
+  } catch (e) {
+    warn({ mode: "diskspace", action: "clear_error", message: (e as Error).message });
   }
 }
