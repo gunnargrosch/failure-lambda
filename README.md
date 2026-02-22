@@ -379,6 +379,8 @@ Contributions are welcome. Please open an [issue](https://github.com/gunnargrosc
 
 - **Gunnar Grosch** — [GitHub](https://github.com/gunnargrosch) | [LinkedIn](https://www.linkedin.com/in/gunnargrosch/)
 - **Jason Barto** — [GitHub](https://github.com/jpbarto) | [LinkedIn](https://www.linkedin.com/in/jasonbarto)
+- **Daniel Reuter** — [GitHub](https://github.com/ReuDa)
+- **Norbert Schneider** — [GitHub](https://github.com/bertschneider)
 
 ## Acknowledgments
 
