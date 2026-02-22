@@ -1,0 +1,79 @@
+import type { Context, Callback } from "aws-lambda";
+
+/** The supported failure injection modes */
+export type FailureMode =
+  | "latency"
+  | "exception"
+  | "statuscode"
+  | "diskspace"
+  | "denylist";
+
+/** Ordered list of all failure modes: non-terminating first, then terminating */
+export const FAILURE_MODE_ORDER: readonly FailureMode[] = [
+  "latency",
+  "diskspace",
+  "denylist",
+  "statuscode",
+  "exception",
+];
+
+/** A single feature flag's value */
+export interface FlagValue {
+  enabled: boolean;
+  /** Probability of injection per invocation (0.0 to 1.0). Defaults to 1. */
+  rate?: number;
+  /** Minimum latency in ms (latency mode) */
+  min_latency?: number;
+  /** Maximum latency in ms (latency mode) */
+  max_latency?: number;
+  /** Error message to throw (exception mode) */
+  exception_msg?: string;
+  /** HTTP status code to return (statuscode mode) */
+  status_code?: number;
+  /** MB of disk to fill in /tmp (diskspace mode) */
+  disk_space?: number;
+  /** Array of regex patterns for hosts to block (denylist mode) */
+  deny_list?: string[];
+}
+
+/** The full config: a map of failure mode names to their flag values */
+export type FailureFlagsConfig = Partial<Record<FailureMode, FlagValue>>;
+
+/** A failure resolved and ready to inject */
+export interface ResolvedFailure {
+  mode: FailureMode;
+  rate: number;
+  flag: FlagValue;
+}
+
+/** Default: empty config, all modes disabled */
+export const DEFAULT_FLAGS_CONFIG: FailureFlagsConfig = {};
+
+/**
+ * Generic Lambda handler type. Intentionally broad to support any
+ * event source (API Gateway, SQS, SNS, EventBridge, etc.).
+ */
+export type LambdaHandler<TEvent = unknown, TResult = unknown> = (
+  event: TEvent,
+  context: Context,
+  callback: Callback<TResult>,
+) => void | Promise<TResult>;
+
+/** Options for the injectFailure wrapper */
+export interface FailureLambdaOptions {
+  /** Override the config source (useful for testing or custom config backends) */
+  configProvider?: () => Promise<FailureFlagsConfig>;
+}
+
+/** Internal: cached config entry */
+export interface CachedConfig {
+  config: FailureFlagsConfig;
+  fetchedAt: number;
+}
+
+/** Validation error detail */
+export interface ConfigValidationError {
+  field: string;
+  message: string;
+  value: unknown;
+}

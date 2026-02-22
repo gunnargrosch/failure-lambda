@@ -1,31 +1,33 @@
 service: failureLambdaExample
-frameworkVersion: ">=1.34.0 <2.0.0"
+frameworkVersion: ">=3.0.0"
 provider:
   name: aws
-  runtime: nodejs14.x
+  runtime: nodejs22.x
   memorySize: 128
-  iamRoleStatements:
-    - Effect: Allow
-      Action:
-        - ssm:GetParameters
-        - ssm:GetParameter
-      Resource:
-        Fn::Join:
-          - ''
-          - - 'arn:aws:ssm:${opt:region, self:provider.region}:*:parameter/'
-            - Ref: failureLambdaParameter
-    - Effect: Allow
-      Action:
-        - dynamodb:PutItem
-        - dynamodb:UpdateItem
-      Resource:
-        Fn::Join:
-          - ''
-          - - 'arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/'
-            - Ref: failureLambdaTable
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - ssm:GetParameters
+            - ssm:GetParameter
+          Resource:
+            Fn::Join:
+              - ''
+              - - 'arn:aws:ssm:${aws:region}:*:parameter/'
+                - Ref: failureLambdaParameter
+        - Effect: Allow
+          Action:
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+          Resource:
+            Fn::Join:
+              - ''
+              - - 'arn:aws:dynamodb:${aws:region}:*:table/'
+                - Ref: failureLambdaTable
 functions:
   failureLambdaExample:
-    handler: index.handler
+    handler: handler.handler
     timeout: 3
     environment:
       FAILURE_INJECTION_PARAM:
@@ -43,7 +45,7 @@ resources:
       Type: 'AWS::SSM::Parameter'
       Properties:
         Type: String
-        Value: '{"isEnabled": false, "failureMode": "latency", "rate": 1, "minLatency": 100, "maxLatency": 400, "exceptionMsg": "Exception message!", "statusCode": 404, "diskSpace": 100, "denylist": ["s3.*.amazonaws.com", "dynamodb.*.amazonaws.com"]}'
+        Value: '{"latency": {"enabled": false, "rate": 1, "min_latency": 100, "max_latency": 400}, "exception": {"enabled": false, "rate": 1, "exception_msg": "Exception message!"}, "statuscode": {"enabled": false, "rate": 1, "status_code": 404}, "diskspace": {"enabled": false, "rate": 1, "disk_space": 100}, "denylist": {"enabled": false, "rate": 1, "deny_list": ["s3.*.amazonaws.com", "dynamodb.*.amazonaws.com"]}}'
     failureLambdaTable:
       Type: 'AWS::DynamoDB::Table'
       DeletionPolicy: Delete

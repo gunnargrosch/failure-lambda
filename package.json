@@ -1,10 +1,32 @@
 {
   "name": "failure-lambda",
-  "version": "0.4.4",
-  "description": "Module for failure injection into AWS Lambda",
-  "main": "./lib/failure.js",
+  "version": "1.0.0",
+  "description": "Failure injection for AWS Lambda - chaos engineering made simple",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "dist"
+  ],
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src/",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "prepublishOnly": "npm run build"
   },
   "repository": {
     "type": "git",
@@ -17,7 +39,10 @@
     "fault",
     "injection",
     "chaos",
-    "chaosengineering"
+    "chaosengineering",
+    "chaos-engineering",
+    "resilience",
+    "testing"
   ],
   "author": "Gunnar Grosch",
   "license": "MIT",
@@ -25,17 +50,19 @@
     "url": "https://github.com/gunnargrosch/failure-lambda/issues"
   },
   "homepage": "https://github.com/gunnargrosch/failure-lambda#readme",
-  "devDependencies": {
-    "aws-sdk": "^2.1074.0",
-    "eslint": "^8.57.0",
-    "eslint-config-standard": "^17.1.0",
-    "eslint-plugin-import": "^2.29.1",
-    "eslint-plugin-node": "^11.1.0",
-    "eslint-plugin-promise": "^6.4.0",
-    "eslint-plugin-standard": "^5.0.0"
-  },
   "dependencies": {
-    "mitm": "^1.7.2",
-    "node-fetch": "^2.6.7"
+    "@aws-sdk/client-ssm": "^3.600.0",
+    "mitm": "^1.7.2"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "@types/aws-lambda": "^8.10.140",
+    "@types/node": "^22.0.0",
+    "@vitest/coverage-v8": "^2.1.0",
+    "aws-sdk-client-mock": "^4.1.0",
+    "tsup": "^8.5.0",
+    "typescript": "^5.6.0",
+    "typescript-eslint": "^8.0.0",
+    "vitest": "^2.1.0"
   }
 }

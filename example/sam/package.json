@@ -1,8 +1,16 @@
 {
   "name": "failure-lambda-example",
-  "version": "0.1.0",
-  "description": "",
+  "version": "1.0.0",
+  "description": "failure-lambda SAM example",
+  "type": "module",
   "dependencies": {
-    "failure-lambda": ""
+    "failure-lambda": "",
+    "@aws-sdk/client-dynamodb": "^3.600.0",
+    "@aws-sdk/lib-dynamodb": "^3.600.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "@types/aws-lambda": "^8.10.140",
+    "esbuild": "^0.24.0"
   }
 }

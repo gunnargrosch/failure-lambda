@@ -1,5 +1,14 @@
-.vscode/
-node_modules/
-example/
+src/
+*.test.ts
+tsconfig.json
+tsup.config.ts
+eslint.config.mjs
+vitest.config.ts
 .editorconfig
 .eslintrc.js
+.vscode/
+.claude/
+node_modules/
+example/
+.github/
+coverage/

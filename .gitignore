@@ -7,3 +7,6 @@ example/.vscode/
 example/.serverless/
 example/node_modules/
 samconfig.toml
+.claude/
+dist/
+coverage/
