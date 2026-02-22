@@ -1,55 +1,66 @@
-import Mitm from "mitm";
+import dns from "node:dns";
 import type { FlagValue } from "../types.js";
 
-/** Module-level mitm instance persists across invocations within a Lambda container */
-let mitmInstance: Mitm.MitmInstance | null = null;
+/** Capture the original dns.lookup once at module load (once per Lambda cold start) */
+const originalLookup = dns.lookup;
 
-export function clearMitm(): void {
-  if (mitmInstance !== null) {
-    mitmInstance.disable();
+/** Whether our wrapper is currently installed on dns.lookup */
+let isActive = false;
+
+/** Current compiled regex patterns (replaced on each injectDenylist call) */
+let activePatterns: RegExp[] = [];
+
+/** Restore dns.lookup and clear denylist patterns */
+export function clearDenylist(): void {
+  if (isActive) {
+    dns.lookup = originalLookup;
+    isActive = false;
+    activePatterns = [];
   }
 }
 
 export function injectDenylist(flag: FlagValue): void {
   const denylistPatterns = flag.deny_list ?? [];
   console.log(
-    `[failure-lambda] Injecting denylist for: ${denylistPatterns.join(", ")}`
+    `[failure-lambda] Injecting denylist for: ${denylistPatterns.join(", ")}`,
   );
 
-  if (mitmInstance === null) {
-    mitmInstance = Mitm();
-  }
-  mitmInstance.enable();
+  activePatterns = denylistPatterns.map((pattern) => new RegExp(pattern));
 
-  const compiledPatterns = denylistPatterns.map(
-    (pattern) => new RegExp(pattern)
-  );
+  if (!isActive) {
+    dns.lookup = function blockedLookup(
+      hostname: string,
+      ...args: unknown[]
+    ): void {
+      const callback = args[args.length - 1] as (
+        err: NodeJS.ErrnoException | null,
+        address?: string,
+        family?: number,
+      ) => void;
+      const rest = args.slice(0, -1);
 
-  mitmInstance.on("connect", (socket: Mitm.MitmSocket, opts: Mitm.MitmConnectOpts) => {
-    const host = opts.host ?? "";
-    const shouldBlock = compiledPatterns.some((regex) => regex.test(host));
+      if (activePatterns.some((regex) => regex.test(hostname))) {
+        console.log(`[failure-lambda] Blocked connection to ${hostname}`);
+        const err = new Error(
+          `getaddrinfo ENOTFOUND ${hostname}`,
+        ) as NodeJS.ErrnoException & { hostname?: string };
+        err.code = "ENOTFOUND";
+        err.hostname = hostname;
+        err.syscall = "getaddrinfo";
+        process.nextTick(() => callback(err));
+        return;
+      }
 
-    if (shouldBlock) {
-      console.log(`[failure-lambda] Blocked connection to ${host}`);
-      socket.end();
-    } else {
-      socket.bypass();
-    }
-  });
+      (originalLookup as Function).call(dns, hostname, ...rest, callback);
+    } as typeof dns.lookup;
 
-  // Remove previously attached handlers, keeping only the most recent
-  const connectEvents = mitmInstance._events?.connect;
-  if (Array.isArray(connectEvents)) {
-    while (Array.isArray(mitmInstance._events?.connect)) {
-      mitmInstance.removeListener("connect", mitmInstance._events.connect[0]);
-    }
+    isActive = true;
   }
 }
 
-/** Reset mitm state entirely. For testing. @internal */
-export function resetMitm(): void {
-  if (mitmInstance !== null) {
-    mitmInstance.disable();
-    mitmInstance = null;
-  }
+/** Reset denylist state entirely. For testing. @internal */
+export function resetDenylist(): void {
+  dns.lookup = originalLookup;
+  isActive = false;
+  activePatterns = [];
 }

@@ -9,7 +9,7 @@ import {
   injectDenylist,
   injectTimeout,
   corruptResponse,
-  clearMitm,
+  clearDenylist,
 } from "./failures/index.js";
 import { matchesConditions } from "./matching.js";
 
@@ -60,9 +60,9 @@ function injectFailure<TEvent = unknown, TResult = unknown>(
       const flagsConfig: FailureFlagsConfig = await configProvider();
       const failures = resolveFailures(flagsConfig);
 
-      // Clear mitm unless denylist is among active failures
+      // Clear denylist unless it's among active failures
       if (!failures.some((f) => f.mode === "denylist")) {
-        clearMitm();
+        clearDenylist();
       }
 
       // --- Pre-handler injection ---
@@ -106,7 +106,7 @@ function injectFailure<TEvent = unknown, TResult = unknown>(
       return result as TResult;
     } catch (error) {
       console.error("[failure-lambda]", error);
-      clearMitm();
+      clearDenylist();
       throw error;
     }
   };

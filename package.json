@@ -64,8 +64,7 @@
   },
   "homepage": "https://github.com/gunnargrosch/failure-lambda#readme",
   "dependencies": {
-    "@aws-sdk/client-ssm": "^3.600.0",
-    "mitm": "^1.7.2"
+    "@aws-sdk/client-ssm": "^3.600.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",

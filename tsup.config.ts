@@ -9,7 +9,6 @@ export default defineConfig({
   splitting: false,
   sourcemap: true,
   target: "node18",
-  external: ["mitm"],
   cjsInterop: true,
   esbuildOptions(options, context) {
     if (context.format === "cjs") {

@@ -9,7 +9,7 @@ import {
   injectDenylist,
   injectTimeout,
   corruptResponse,
-  clearMitm,
+  clearDenylist,
 } from "./failures/index.js";
 import { matchesConditions } from "./matching.js";
 
@@ -38,7 +38,7 @@ export function failureLambdaMiddleware<TEvent = unknown, TResult = unknown>(
       request.internal = { ...request.internal, failureLambdaFailures: failures };
 
       if (!failures.some((f) => f.mode === "denylist")) {
-        clearMitm();
+        clearDenylist();
       }
 
       for (const failure of failures) {
