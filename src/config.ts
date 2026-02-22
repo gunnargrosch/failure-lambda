@@ -280,7 +280,7 @@ export function resolveFailures(config: FailureFlagsConfig): ResolvedFailure[] {
 
     failures.push({
       mode,
-      rate: flag.rate ?? 1,
+      rate: Math.max(0, Math.min(1, flag.rate ?? 1)),
       flag,
     });
   }
@@ -313,7 +313,7 @@ async function fetchFromAppConfig(): Promise<FailureFlagsConfig> {
 }
 
 async function fetchFromSSM(): Promise<FailureFlagsConfig> {
-  const parameterName = process.env.FAILURE_INJECTION_PARAM!;
+  const parameterName = process.env.FAILURE_INJECTION_PARAM as string;
   const client = getSSMClient();
   const command = new GetParameterCommand({ Name: parameterName });
   const response = await client.send(command);
@@ -329,8 +329,8 @@ async function fetchFromSSM(): Promise<FailureFlagsConfig> {
 
 /** Fetch config from AppConfig or SSM, with caching. */
 export async function getConfig(): Promise<FailureFlagsConfig> {
-  if (isCacheValid()) {
-    return configCache!.config;
+  if (isCacheValid() && configCache !== null) {
+    return configCache.config;
   }
 
   try {

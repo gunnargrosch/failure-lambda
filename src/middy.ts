@@ -11,6 +11,7 @@ interface MiddyRequest<TEvent = unknown, TResult = unknown> {
 }
 
 interface MiddyMiddleware<TEvent = unknown, TResult = unknown> {
+  // eslint-disable-next-line @typescript-eslint/no-invalid-void-type -- Middy before hook returns TResult | void
   before: (request: MiddyRequest<TEvent, TResult>) => Promise<TResult | void>;
   after: (request: MiddyRequest<TEvent, TResult>) => Promise<void>;
 }
@@ -44,7 +45,7 @@ export function failureLambdaMiddleware<TEvent = unknown, TResult = unknown>(
         failures,
         request.event,
         request.response,
-      ) as TResult;
+      );
     },
   };
 }

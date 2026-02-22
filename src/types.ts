@@ -78,6 +78,7 @@ export type LambdaHandler<TEvent = unknown, TResult = unknown> = (
   event: TEvent,
   context: Context,
   callback: Callback<TResult>,
+  // eslint-disable-next-line @typescript-eslint/no-invalid-void-type -- Lambda handlers may return void or Promise
 ) => void | Promise<TResult>;
 
 /** Options for the injectFailure wrapper */

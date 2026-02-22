@@ -141,7 +141,7 @@ describe("injectDiskSpace", () => {
       "if=/dev/zero",
       expect.stringMatching(/^of=\/tmp\/diskspace-failure-\d+\.tmp$/),
       "count=1000",
-      "bs=200000",
+      "bs=204800",
     ]);
   });
 
@@ -156,7 +156,7 @@ describe("injectDiskSpace", () => {
 
     injectDiskSpace(flag);
 
-    expect(spawnMock).toHaveBeenCalledWith("dd", expect.arrayContaining(["bs=100000"]));
+    expect(spawnMock).toHaveBeenCalledWith("dd", expect.arrayContaining(["bs=102400"]));
   });
 
   it("should log error when spawnSync fails", async () => {

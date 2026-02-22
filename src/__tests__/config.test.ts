@@ -357,6 +357,20 @@ describe("resolveFailures", () => {
     expect(failures[0].rate).toBe(0.3);
   });
 
+  it("should clamp rate above 1 to 1", () => {
+    const failures = resolveFailures({
+      latency: { enabled: true, rate: 1.5 },
+    });
+    expect(failures[0].rate).toBe(1);
+  });
+
+  it("should clamp rate below 0 to 0", () => {
+    const failures = resolveFailures({
+      latency: { enabled: true, rate: -0.5 },
+    });
+    expect(failures[0].rate).toBe(0);
+  });
+
   it("should include timeout and corruption in correct order", () => {
     const failures = resolveFailures({
       corruption: { enabled: true },

@@ -161,7 +161,7 @@ describe("injectDenylist", () => {
   });
 
   it("should skip invalid regex patterns and log warning", async () => {
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "log").mockImplementation(() => {});
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     injectDenylist({ enabled: true, deny_list: ["(invalid[", "blocked\\.com"] });

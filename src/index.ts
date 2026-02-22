@@ -57,9 +57,9 @@ function injectFailure<TEvent = unknown, TResult = unknown>(
         return preResult.shortCircuit;
       }
 
-      const result = await handler(event, context, callback);
+      const result = await handler(event, context, callback) as TResult;
 
-      return runPostHandlerInjections(failures, event, result) as TResult;
+      return runPostHandlerInjections(failures, event, result);
     } catch (err) {
       logError({ action: "error", message: err instanceof Error ? err.message : String(err) });
       clearDenylist();

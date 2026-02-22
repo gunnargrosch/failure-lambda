@@ -64,18 +64,20 @@ export async function runPreHandlerInjections<TEvent = unknown, TResult = unknow
  *
  * Returns the (potentially modified) result.
  */
-export function runPostHandlerInjections<TEvent = unknown>(
+export function runPostHandlerInjections<TEvent = unknown, TResult = unknown>(
   failures: ResolvedFailure[],
   event: TEvent,
-  result: unknown,
-): unknown {
+  result: TResult,
+): TResult {
+  let current: unknown = result;
+
   for (const failure of failures) {
     if (failure.mode !== "corruption") continue;
     if (failure.flag.match && !matchesConditions(event, failure.flag.match)) continue;
     if (Math.random() >= failure.rate) continue;
 
-    result = corruptResponse(failure.flag, result);
+    current = corruptResponse(failure.flag, current);
   }
 
-  return result;
+  return current as TResult;
 }

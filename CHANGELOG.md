@@ -41,7 +41,9 @@ Rewritten in TypeScript with a feature flag configuration model.
 - Invalid denylist regex patterns are caught and skipped with a warning instead of crashing the invocation
 - `matchesConditions` no longer matches `null`/`undefined` values against `"null"`/`"undefined"` strings
 - Corruption mode wraps in `{ body }` when result has no body field instead of returning raw string
-- Diskspace injection logs errors when `dd` exits with non-zero status
+- Diskspace injection logs errors when `dd` exits with non-zero status and uses correct `* 1024` for MB calculation
+- Out-of-range `rate` values are clamped to `[0, 1]` instead of silently misbehaving
+- ESLint configuration includes test files and all lint errors resolved
 - Coverage thresholds now include the main wrapper (`src/index.ts`)
 - CDK example updated to modern dependencies; timeout and corruption modes added to CDK and Serverless examples
 

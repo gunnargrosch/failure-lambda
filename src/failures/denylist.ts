@@ -57,7 +57,7 @@ export function injectDenylist(flag: FlagValue): void {
         return;
       }
 
-      (originalLookup as Function).call(dns, hostname, ...rest, callback);
+      (originalLookup as (...args: unknown[]) => void).call(dns, hostname, ...rest, callback);
     } as typeof dns.lookup;
 
     isActive = true;
