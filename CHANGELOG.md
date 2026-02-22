@@ -64,6 +64,11 @@ Rewritten in TypeScript with a feature flag configuration model.
 
 ## [0.4.3] - 2022-02-14
 
+### Added
+
+- MIT license file
+- New sample applications for SAM, CDK, and Serverless Framework
+
 ### Changed
 
 - Updated dependencies
@@ -72,7 +77,9 @@ Rewritten in TypeScript with a feature flag configuration model.
 
 ### Fixed
 
-- Puts the mitm object in the library global namespace so that it persists across function invocations
+- Fixed mitm listener state management to prevent traffic leaking through during enable/disable
+- Fixed mitm not disabling when no longer needed
+- Moved mitm object to library global namespace so that it persists across function invocations
 
 ### Changed
 
