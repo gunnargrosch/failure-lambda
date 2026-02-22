@@ -219,6 +219,61 @@ describe("failureLambdaMiddleware", () => {
     });
   });
 
+  describe("onError hook", () => {
+    it("should log error and clear denylist/diskspace on error", async () => {
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      const middleware = failureLambdaMiddleware({
+        configProvider: createConfigProvider({}),
+      });
+
+      const request = {
+        event: {},
+        context: mockContext,
+        error: new Error("handler failed"),
+        internal: {},
+      } as {
+        event: unknown;
+        context: Context;
+        response?: unknown;
+        error?: Error;
+        internal?: Record<string, unknown>;
+      };
+
+      await middleware.onError(request);
+
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('"action":"error"'),
+      );
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('"message":"handler failed"'),
+      );
+    });
+
+    it("should handle missing error gracefully", async () => {
+      vi.spyOn(console, "error").mockImplementation(() => {});
+
+      const middleware = failureLambdaMiddleware({
+        configProvider: createConfigProvider({}),
+      });
+
+      const request = {
+        event: {},
+        context: mockContext,
+        internal: {},
+      } as {
+        event: unknown;
+        context: Context;
+        response?: unknown;
+        error?: Error;
+        internal?: Record<string, unknown>;
+      };
+
+      // Should not throw even with no error on request
+      await expect(middleware.onError(request)).resolves.toBeUndefined();
+    });
+  });
+
   describe("event matching", () => {
     it("should respect match conditions in before phase", async () => {
       vi.spyOn(Math, "random").mockReturnValue(0);

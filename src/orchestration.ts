@@ -5,10 +5,11 @@ import {
   injectException,
   injectStatusCode,
   injectDiskSpace,
+  clearDiskSpace,
   injectDenylist,
+  clearDenylist,
   injectTimeout,
   corruptResponse,
-  clearDenylist,
 } from "./failures/index.js";
 import { matchesConditions } from "./matching.js";
 import { log } from "./log.js";
@@ -29,8 +30,12 @@ export async function runPreHandlerInjections<TEvent = unknown, TResult = unknow
   context: Context,
   dryRun = false,
 ): Promise<ShortCircuitResult<TResult> | undefined> {
-  if (!dryRun && !failures.some((f) => f.mode === "denylist")) {
+  // Always clear previous invocation's side effects before re-evaluating.
+  // Without this, a denylist/diskspace injection from a prior invocation persists
+  // even when the rate check fails on the current invocation.
+  if (!dryRun) {
     clearDenylist();
+    clearDiskSpace();
   }
 
   for (const failure of failures) {

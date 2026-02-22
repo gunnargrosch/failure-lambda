@@ -1,12 +1,15 @@
 import type { Context } from "aws-lambda";
 import type { FailureLambdaOptions, ResolvedFailure } from "./types.js";
 import { getConfig, resolveFailures } from "./config.js";
+import { clearDenylist, clearDiskSpace } from "./failures/index.js";
+import { error as logError } from "./log.js";
 import { runPreHandlerInjections, runPostHandlerInjections } from "./orchestration.js";
 
 interface MiddyRequest<TEvent = unknown, TResult = unknown> {
   event: TEvent;
   context: Context;
   response?: TResult;
+  error?: Error;
   internal?: Record<string, unknown>;
 }
 
@@ -14,6 +17,7 @@ interface MiddyMiddleware<TEvent = unknown, TResult = unknown> {
   // eslint-disable-next-line @typescript-eslint/no-invalid-void-type -- Middy before hook returns TResult | void
   before: (request: MiddyRequest<TEvent, TResult>) => Promise<TResult | void>;
   after: (request: MiddyRequest<TEvent, TResult>) => Promise<void>;
+  onError: (request: MiddyRequest<TEvent, TResult>) => Promise<void>;
 }
 
 export function failureLambdaMiddleware<TEvent = unknown, TResult = unknown>(
@@ -56,6 +60,11 @@ export function failureLambdaMiddleware<TEvent = unknown, TResult = unknown>(
         request.response,
         dryRun,
       );
+    },
+    onError: async (request) => {
+      logError({ action: "error", message: request.error?.message ?? "unknown error" });
+      clearDenylist();
+      clearDiskSpace();
     },
   };
 }

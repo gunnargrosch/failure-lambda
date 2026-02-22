@@ -10,15 +10,7 @@ import type {
 import { DEFAULT_FLAGS_CONFIG, FAILURE_MODE_ORDER } from "./types.js";
 import { warn, error } from "./log.js";
 
-const KNOWN_FLAGS: ReadonlySet<string> = new Set<FailureMode>([
-  "latency",
-  "exception",
-  "statuscode",
-  "diskspace",
-  "denylist",
-  "timeout",
-  "corruption",
-]);
+const KNOWN_FLAGS: ReadonlySet<string> = new Set(FAILURE_MODE_ORDER);
 
 const DEFAULT_CACHE_TTL_SECONDS = 60;
 
