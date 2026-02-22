@@ -28,7 +28,9 @@ Resources:
           "exception": {"enabled": false, "rate": 1, "exception_msg": "Exception message!"},
           "statuscode": {"enabled": false, "rate": 1, "status_code": 404},
           "diskspace": {"enabled": false, "rate": 1, "disk_space": 100},
-          "denylist": {"enabled": false, "rate": 1, "deny_list": ["s3.*.amazonaws.com", "dynamodb.*.amazonaws.com"]}
+          "denylist": {"enabled": false, "rate": 1, "deny_list": ["s3.*.amazonaws.com", "dynamodb.*.amazonaws.com"]},
+          "timeout": {"enabled": false, "rate": 1, "timeout_buffer_ms": 500},
+          "corruption": {"enabled": false, "rate": 1, "body": "{\"error\": \"corrupted\"}"}
         }
 
   # --- AppConfig resources ---
@@ -100,6 +102,20 @@ Resources:
                 "rate": {"constraints": {"type": "number", "minimum": 0, "maximum": 1}},
                 "deny_list": {"constraints": {"type": "array", "elements": {"type": "string"}, "required": true}}
               }
+            },
+            "timeout": {
+              "name": "Timeout Injection",
+              "attributes": {
+                "rate": {"constraints": {"type": "number", "minimum": 0, "maximum": 1}},
+                "timeout_buffer_ms": {"constraints": {"type": "number", "minimum": 0}}
+              }
+            },
+            "corruption": {
+              "name": "Response Corruption",
+              "attributes": {
+                "rate": {"constraints": {"type": "number", "minimum": 0, "maximum": 1}},
+                "body": {"constraints": {"type": "string"}}
+              }
             }
           },
           "values": {
@@ -107,7 +123,9 @@ Resources:
             "exception": {"enabled": false, "rate": 1, "exception_msg": "Exception message!"},
             "statuscode": {"enabled": false, "rate": 1, "status_code": 404},
             "diskspace": {"enabled": false, "rate": 1, "disk_space": 100},
-            "denylist": {"enabled": false, "rate": 1, "deny_list": ["s3.*.amazonaws.com", "dynamodb.*.amazonaws.com"]}
+            "denylist": {"enabled": false, "rate": 1, "deny_list": ["s3.*.amazonaws.com", "dynamodb.*.amazonaws.com"]},
+            "timeout": {"enabled": false, "rate": 1, "timeout_buffer_ms": 500},
+            "corruption": {"enabled": false, "rate": 1, "body": "{\"error\": \"corrupted\"}"}
           }
         }
 

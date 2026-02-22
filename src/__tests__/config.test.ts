@@ -152,6 +152,93 @@ describe("validateFlagValue", () => {
     const errors = validateFlagValue("exception", { enabled: true, min_latency: -10 });
     expect(errors).toHaveLength(0);
   });
+
+  it("should return no errors for valid timeout flag", () => {
+    const errors = validateFlagValue("timeout", { enabled: true, timeout_buffer_ms: 500 });
+    expect(errors).toHaveLength(0);
+  });
+
+  it("should return error for negative timeout_buffer_ms", () => {
+    const errors = validateFlagValue("timeout", { enabled: true, timeout_buffer_ms: -100 });
+    expect(errors).toHaveLength(1);
+    expect(errors[0].field).toBe("timeout.timeout_buffer_ms");
+  });
+
+  it("should return error for non-number timeout_buffer_ms", () => {
+    const errors = validateFlagValue("timeout", { enabled: true, timeout_buffer_ms: "fast" });
+    expect(errors).toHaveLength(1);
+    expect(errors[0].field).toBe("timeout.timeout_buffer_ms");
+  });
+
+  it("should accept timeout_buffer_ms of 0", () => {
+    const errors = validateFlagValue("timeout", { enabled: true, timeout_buffer_ms: 0 });
+    expect(errors).toHaveLength(0);
+  });
+
+  it("should return no errors for valid corruption flag with body", () => {
+    const errors = validateFlagValue("corruption", { enabled: true, body: '{"error": true}' });
+    expect(errors).toHaveLength(0);
+  });
+
+  it("should return no errors for corruption flag without body", () => {
+    const errors = validateFlagValue("corruption", { enabled: true });
+    expect(errors).toHaveLength(0);
+  });
+
+  it("should return error for non-string corruption body", () => {
+    const errors = validateFlagValue("corruption", { enabled: true, body: 123 });
+    expect(errors).toHaveLength(1);
+    expect(errors[0].field).toBe("corruption.body");
+  });
+
+  it("should return no errors for valid match conditions", () => {
+    const errors = validateFlagValue("corruption", {
+      enabled: true,
+      match: [{ path: "requestContext.http.method", value: "GET" }],
+    });
+    expect(errors).toHaveLength(0);
+  });
+
+  it("should return error when match is not an array", () => {
+    const errors = validateFlagValue("latency", { enabled: true, match: "not-array" });
+    expect(errors).toHaveLength(1);
+    expect(errors[0].field).toBe("latency.match");
+  });
+
+  it("should return error for match condition missing path", () => {
+    const errors = validateFlagValue("latency", {
+      enabled: true,
+      match: [{ value: "GET" }],
+    });
+    expect(errors).toHaveLength(1);
+    expect(errors[0].field).toBe("latency.match[0]");
+  });
+
+  it("should return error for match condition missing value", () => {
+    const errors = validateFlagValue("latency", {
+      enabled: true,
+      match: [{ path: "foo" }],
+    });
+    expect(errors).toHaveLength(1);
+    expect(errors[0].field).toBe("latency.match[0]");
+  });
+
+  it("should return error for non-object match condition", () => {
+    const errors = validateFlagValue("latency", {
+      enabled: true,
+      match: ["not-an-object"],
+    });
+    expect(errors).toHaveLength(1);
+    expect(errors[0].field).toBe("latency.match[0]");
+  });
+
+  it("should validate match conditions on any mode", () => {
+    const errors = validateFlagValue("exception", {
+      enabled: true,
+      match: [{ path: "method", value: "GET" }],
+    });
+    expect(errors).toHaveLength(0);
+  });
 });
 
 describe("parseFlags", () => {
@@ -192,6 +279,21 @@ describe("parseFlags", () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     const config = parseFlags({ latency: { enabled: true, rate: 1.5 } });
     expect(config.latency?.enabled).toBe(true);
+  });
+
+  it("should parse timeout flag", () => {
+    const config = parseFlags({ timeout: { enabled: true, timeout_buffer_ms: 200 } });
+    expect(config.timeout?.enabled).toBe(true);
+    expect(config.timeout?.timeout_buffer_ms).toBe(200);
+  });
+
+  it("should parse corruption flag", () => {
+    const config = parseFlags({
+      corruption: { enabled: true, body: '{"error": true}', match: [{ path: "method", value: "GET" }] },
+    });
+    expect(config.corruption?.enabled).toBe(true);
+    expect(config.corruption?.body).toBe('{"error": true}');
+    expect(config.corruption?.match).toHaveLength(1);
   });
 });
 
@@ -235,6 +337,33 @@ describe("resolveFailures", () => {
       latency: { enabled: true, rate: 0.3 },
     });
     expect(failures[0].rate).toBe(0.3);
+  });
+
+  it("should include timeout and corruption in correct order", () => {
+    const failures = resolveFailures({
+      corruption: { enabled: true },
+      timeout: { enabled: true, timeout_buffer_ms: 500 },
+      latency: { enabled: true, min_latency: 10, max_latency: 20 },
+      exception: { enabled: true },
+    });
+
+    const modes = failures.map((f) => f.mode);
+    expect(modes).toEqual(["latency", "timeout", "exception", "corruption"]);
+  });
+
+  it("should place corruption last in full ordering", () => {
+    const failures = resolveFailures({
+      exception: { enabled: true },
+      latency: { enabled: true },
+      timeout: { enabled: true },
+      diskspace: { enabled: true },
+      denylist: { enabled: true },
+      statuscode: { enabled: true },
+      corruption: { enabled: true },
+    });
+
+    const modes = failures.map((f) => f.mode);
+    expect(modes).toEqual(["latency", "timeout", "diskspace", "denylist", "statuscode", "exception", "corruption"]);
   });
 });
 

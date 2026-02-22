@@ -6,16 +6,31 @@ export type FailureMode =
   | "exception"
   | "statuscode"
   | "diskspace"
-  | "denylist";
+  | "denylist"
+  | "timeout"
+  | "corruption";
 
-/** Ordered list of all failure modes: non-terminating first, then terminating */
+/**
+ * Ordered list of all failure modes.
+ * Non-terminating pre-handler first, then terminating, then post-handler (corruption) last.
+ */
 export const FAILURE_MODE_ORDER: readonly FailureMode[] = [
   "latency",
+  "timeout",
   "diskspace",
   "denylist",
   "statuscode",
   "exception",
+  "corruption",
 ];
+
+/** Condition for event-based targeting */
+export interface MatchCondition {
+  /** Dot-separated path into the event object (e.g. "requestContext.http.method") */
+  path: string;
+  /** Expected string value at the path */
+  value: string;
+}
 
 /** A single feature flag's value */
 export interface FlagValue {
@@ -34,6 +49,12 @@ export interface FlagValue {
   disk_space?: number;
   /** Array of regex patterns for hosts to block (denylist mode) */
   deny_list?: string[];
+  /** Buffer in ms before Lambda timeout (timeout mode). Default: 0 */
+  timeout_buffer_ms?: number;
+  /** Replacement body string (corruption mode) */
+  body?: string;
+  /** Event-based targeting conditions. All conditions must match for the flag to fire. */
+  match?: MatchCondition[];
 }
 
 /** The full config: a map of failure mode names to their flag values */

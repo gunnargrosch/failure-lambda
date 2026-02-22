@@ -7,8 +7,11 @@ import {
   injectStatusCode,
   injectDiskSpace,
   injectDenylist,
+  injectTimeout,
+  corruptResponse,
   clearMitm,
 } from "./failures/index.js";
+import { matchesConditions } from "./matching.js";
 
 // Re-export types for consumers
 export type {
@@ -19,16 +22,20 @@ export type {
   LambdaHandler,
   FailureLambdaOptions,
   ConfigValidationError,
+  MatchCondition,
 } from "./types.js";
 export { getConfig, clearConfigCache, validateFlagValue, parseFlags, resolveFailures } from "./config.js";
+export { getNestedValue, matchesConditions } from "./matching.js";
 
 /**
  * Wraps a Lambda handler with failure injection.
  *
  * Each failure mode is an independent feature flag. Multiple failures can
- * be active simultaneously. Non-terminating modes (latency, diskspace,
- * denylist) run first, then terminating modes (statuscode, exception)
- * short-circuit before the handler.
+ * be active simultaneously. Pre-handler modes run before the handler
+ * (latency, timeout, diskspace, denylist, statuscode, exception).
+ * Post-handler modes (corruption) run after the handler returns.
+ *
+ * Flags with `match` conditions only fire when the event satisfies all conditions.
  *
  * @example
  * ```ts
@@ -58,15 +65,18 @@ function injectFailure<TEvent = unknown, TResult = unknown>(
         clearMitm();
       }
 
-      // Inject each enabled failure (order: latency, diskspace, denylist, statuscode, exception)
+      // --- Pre-handler injection ---
       for (const failure of failures) {
-        if (Math.random() >= failure.rate) {
-          continue;
-        }
+        if (failure.mode === "corruption") continue;
+        if (failure.flag.match && !matchesConditions(event, failure.flag.match)) continue;
+        if (Math.random() >= failure.rate) continue;
 
         switch (failure.mode) {
           case "latency":
             await injectLatency(failure.flag);
+            break;
+          case "timeout":
+            await injectTimeout(failure.flag, context);
             break;
           case "diskspace":
             injectDiskSpace(failure.flag);
@@ -81,7 +91,18 @@ function injectFailure<TEvent = unknown, TResult = unknown>(
         }
       }
 
-      const result = await handler(event, context, callback);
+      // --- Handler ---
+      let result: unknown = await handler(event, context, callback);
+
+      // --- Post-handler injection ---
+      for (const failure of failures) {
+        if (failure.mode !== "corruption") continue;
+        if (failure.flag.match && !matchesConditions(event, failure.flag.match)) continue;
+        if (Math.random() >= failure.rate) continue;
+
+        result = corruptResponse(failure.flag, result);
+      }
+
       return result as TResult;
     } catch (error) {
       console.error("[failure-lambda]", error);

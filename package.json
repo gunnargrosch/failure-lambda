@@ -11,6 +11,19 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
+    },
+    "./middy": {
+      "types": "./dist/middy.d.ts",
+      "import": "./dist/middy.js",
+      "require": "./dist/middy.cjs"
+    }
+  },
+  "peerDependencies": {
+    "@middy/core": ">=4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@middy/core": {
+      "optional": true
     }
   },
   "engines": {

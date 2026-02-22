@@ -2,7 +2,10 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { injectLatency } from "../failures/latency.js";
 import { injectException } from "../failures/exception.js";
 import { injectStatusCode } from "../failures/statuscode.js";
+import { injectTimeout } from "../failures/timeout.js";
+import { corruptResponse } from "../failures/corruption.js";
 import type { FlagValue } from "../types.js";
+import type { Context } from "aws-lambda";
 
 vi.mock("node:child_process", () => ({
   spawnSync: vi.fn(() => ({
@@ -184,5 +187,134 @@ describe("injectDiskSpace", () => {
       "[failure-lambda] Failed to inject disk space:",
       spawnError
     );
+  });
+});
+
+describe("injectTimeout", () => {
+  it("should sleep for remaining minus buffer", async () => {
+    vi.useFakeTimers();
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    const mockContext = {
+      getRemainingTimeInMillis: () => 5000,
+    } as Context;
+
+    const flag: FlagValue = { enabled: true, timeout_buffer_ms: 500 };
+
+    const promise = injectTimeout(flag, mockContext);
+    vi.advanceTimersByTime(4500);
+    await promise;
+
+    expect(logSpy).toHaveBeenCalledWith(
+      "[failure-lambda] Injecting timeout: sleeping 4500ms (buffer: 500ms, remaining: 5000ms)",
+    );
+
+    vi.useRealTimers();
+  });
+
+  it("should default buffer to 0 when timeout_buffer_ms is undefined", async () => {
+    vi.useFakeTimers();
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    const mockContext = {
+      getRemainingTimeInMillis: () => 3000,
+    } as Context;
+
+    const flag: FlagValue = { enabled: true };
+
+    const promise = injectTimeout(flag, mockContext);
+    vi.advanceTimersByTime(3000);
+    await promise;
+
+    expect(logSpy).toHaveBeenCalledWith(
+      "[failure-lambda] Injecting timeout: sleeping 3000ms (buffer: 0ms, remaining: 3000ms)",
+    );
+
+    vi.useRealTimers();
+  });
+
+  it("should clamp to 0 when buffer exceeds remaining time", async () => {
+    vi.useFakeTimers();
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    const mockContext = {
+      getRemainingTimeInMillis: () => 100,
+    } as Context;
+
+    const flag: FlagValue = { enabled: true, timeout_buffer_ms: 500 };
+
+    const promise = injectTimeout(flag, mockContext);
+    await vi.advanceTimersByTimeAsync(0);
+    await promise;
+
+    expect(logSpy).toHaveBeenCalledWith(
+      "[failure-lambda] Injecting timeout: sleeping 0ms (buffer: 500ms, remaining: 100ms)",
+    );
+
+    vi.useRealTimers();
+  });
+});
+
+describe("corruptResponse", () => {
+  it("should replace body with configured string when result has body", () => {
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const flag: FlagValue = { enabled: true, body: '{"error": "corrupted"}' };
+
+    const result = corruptResponse(flag, { statusCode: 200, body: "original" });
+
+    expect(result).toEqual({ statusCode: 200, body: '{"error": "corrupted"}' });
+    expect(logSpy).toHaveBeenCalledWith("[failure-lambda] Injecting response corruption: replacing body");
+  });
+
+  it("should return body string when result has no body field", () => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const flag: FlagValue = { enabled: true, body: '{"error": "corrupted"}' };
+
+    const result = corruptResponse(flag, "raw string");
+
+    expect(result).toBe('{"error": "corrupted"}');
+  });
+
+  it("should mangle body when no replacement body is configured", () => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
+
+    const flag: FlagValue = { enabled: true };
+    const original = "This is a long response body that will be mangled";
+
+    const result = corruptResponse(flag, { statusCode: 200, body: original }) as Record<string, unknown>;
+
+    expect(result.statusCode).toBe(200);
+    expect(typeof result.body).toBe("string");
+    expect((result.body as string).length).toBeLessThan(original.length + 10);
+    expect((result.body as string)).toContain("\uFFFD");
+  });
+
+  it("should return result as-is when mangling and result has no body", () => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const flag: FlagValue = { enabled: true };
+
+    const original = { statusCode: 200, data: "no body field" };
+    const result = corruptResponse(flag, original);
+
+    expect(result).toEqual(original);
+  });
+
+  it("should handle empty body string in mangle mode", () => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const flag: FlagValue = { enabled: true };
+
+    const result = corruptResponse(flag, { statusCode: 200, body: "" }) as Record<string, unknown>;
+
+    expect(result.body).toBe("");
+  });
+
+  it("should handle null result in replace mode", () => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const flag: FlagValue = { enabled: true, body: "replaced" };
+
+    const result = corruptResponse(flag, null);
+
+    expect(result).toBe("replaced");
   });
 });

@@ -2,7 +2,7 @@
 
 ## Description
 
-`failure-lambda` is a Node.js module for injecting failure into [AWS Lambda](https://aws.amazon.com/lambda). It offers a simple failure injection wrapper for your Lambda handler where each failure mode is an independent feature flag: `latency`, `exception`, `denylist`, `diskspace`, and `statuscode`. Multiple failure modes can be active simultaneously. You control your failure injection using [SSM Parameter Store](https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-parameter-store.html) or [AWS AppConfig Feature Flags](https://docs.aws.amazon.com/appconfig/latest/userguide/appconfig-creating-configuration-and-profile-feature-flags.html).
+`failure-lambda` is a Node.js module for injecting failure into [AWS Lambda](https://aws.amazon.com/lambda). It offers a simple failure injection wrapper for your Lambda handler where each failure mode is an independent feature flag: `latency`, `timeout`, `exception`, `denylist`, `diskspace`, `statuscode`, and `corruption`. Multiple failure modes can be active simultaneously. You control your failure injection using [SSM Parameter Store](https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-parameter-store.html) or [AWS AppConfig Feature Flags](https://docs.aws.amazon.com/appconfig/latest/userguide/appconfig-creating-configuration-and-profile-feature-flags.html).
 
 **v1.0.0** is a major release with breaking changes. See [Migration from 0.x](#migration-from-0x) below.
 
@@ -45,12 +45,29 @@ exports.handler = failureLambda(async (event, context) => {
 
 ```ts
 import { injectFailure, getConfig, validateFlagValue, resolveFailures } from "failure-lambda";
-import type { FlagValue, FailureFlagsConfig, ResolvedFailure, FailureMode } from "failure-lambda";
+import type { FlagValue, FailureFlagsConfig, ResolvedFailure, FailureMode, MatchCondition } from "failure-lambda";
 
 export const handler = injectFailure(async (event, context) => {
   // your handler logic
 });
 ```
+
+### Middy middleware
+
+If you use [Middy](https://middy.js.org/) (v4+), you can integrate via the `failure-lambda/middy` subpath export instead of wrapping your handler:
+
+```ts
+import middy from "@middy/core";
+import { failureLambdaMiddleware } from "failure-lambda/middy";
+
+export const handler = middy()
+  .use(failureLambdaMiddleware())
+  .handler(async (event, context) => {
+    return { statusCode: 200, body: "OK" };
+  });
+```
+
+The middleware runs pre-handler failures (latency, timeout, etc.) in its `before` phase and post-handler failures (corruption) in its `after` phase. It supports the same `configProvider` option as the wrapper.
 
 ## Configuration Format
 
@@ -62,7 +79,9 @@ Each failure mode is an independent feature flag. Multiple modes can be enabled 
   "exception": { "enabled": false, "rate": 1, "exception_msg": "Exception message!" },
   "statuscode": { "enabled": false, "rate": 1, "status_code": 404 },
   "diskspace": { "enabled": false, "rate": 1, "disk_space": 100 },
-  "denylist": { "enabled": true, "rate": 0.5, "deny_list": ["s3.*.amazonaws.com", "dynamodb.*.amazonaws.com"] }
+  "denylist": { "enabled": true, "rate": 0.5, "deny_list": ["s3.*.amazonaws.com", "dynamodb.*.amazonaws.com"] },
+  "timeout": { "enabled": false, "rate": 1, "timeout_buffer_ms": 500 },
+  "corruption": { "enabled": false, "rate": 0.3, "body": "{\"error\": \"corrupted\"}" }
 }
 ```
 
@@ -74,24 +93,52 @@ When a flag is disabled, only `{"enabled": false}` is needed — attributes are 
 |------|-----------|------|-------------|
 | *all* | `enabled` | `boolean` | Enable/disable this failure mode |
 | *all* | `rate` | `number` | Probability of injection (0-1). Default: `1` |
+| *all* | `match` | `object[]` | Event-based targeting conditions (see below) |
 | `latency` | `min_latency` | `number` | Minimum latency in ms |
 | `latency` | `max_latency` | `number` | Maximum latency in ms |
 | `exception` | `exception_msg` | `string` | Error message thrown |
 | `statuscode` | `status_code` | `number` | HTTP status code returned (100-599) |
 | `diskspace` | `disk_space` | `number` | MB of disk to fill in `/tmp` |
 | `denylist` | `deny_list` | `string[]` | Regex patterns; matching hosts are blocked |
+| `timeout` | `timeout_buffer_ms` | `number` | Buffer in ms before Lambda timeout. Default: `0` |
+| `corruption` | `body` | `string` | Replacement response body. If omitted, body is mangled. |
 
 ### Injection Order
 
-When multiple modes are enabled, non-terminating failures run first, then terminating failures short-circuit:
+When multiple modes are enabled, pre-handler failures run first, then the handler executes, then post-handler failures modify the response:
 
+**Pre-handler** (before the handler):
 1. `latency` — adds delay, then continues
-2. `diskspace` — fills `/tmp`, then continues
-3. `denylist` — blocks matching network hosts, then continues
-4. `statuscode` — returns status code response, **skips handler**
-5. `exception` — throws error, **skips handler**
+2. `timeout` — sleeps until Lambda timeout minus buffer, then continues
+3. `diskspace` — fills `/tmp`, then continues
+4. `denylist` — blocks matching network hosts, then continues
+5. `statuscode` — returns status code response, **skips handler**
+6. `exception` — throws error, **skips handler**
+
+**Post-handler** (after the handler returns):
+7. `corruption` — corrupts or replaces the handler's response
 
 Each flag's `rate` is rolled independently.
+
+### Event-Based Targeting
+
+Any flag can include a `match` array to restrict injection to events matching specific conditions. Each condition specifies a dot-separated `path` into the event and an expected `value`. All conditions must match for the flag to fire.
+
+```json
+{
+  "corruption": {
+    "enabled": true,
+    "rate": 0.3,
+    "body": "{\"error\": \"corrupted\"}",
+    "match": [
+      { "path": "requestContext.http.method", "value": "GET" },
+      { "path": "requestContext.stage", "value": "prod" }
+    ]
+  }
+}
+```
+
+This example only corrupts GET requests to the `prod` stage. Flags without `match` apply to all invocations.
 
 ## Configuration Sources
 
@@ -104,7 +151,9 @@ aws ssm put-parameter --region eu-west-1 --name failureLambdaConfig --type Strin
   "exception": {"enabled": false, "rate": 1, "exception_msg": "Exception message!"},
   "statuscode": {"enabled": false, "rate": 1, "status_code": 404},
   "diskspace": {"enabled": false, "rate": 1, "disk_space": 100},
-  "denylist": {"enabled": false, "rate": 1, "deny_list": ["s3.*.amazonaws.com", "dynamodb.*.amazonaws.com"]}
+  "denylist": {"enabled": false, "rate": 1, "deny_list": ["s3.*.amazonaws.com", "dynamodb.*.amazonaws.com"]},
+  "timeout": {"enabled": false, "rate": 1, "timeout_buffer_ms": 500},
+  "corruption": {"enabled": false, "rate": 1, "body": "{\"error\": \"corrupted\"}"}
 }'
 ```
 2. Add an environment variable to your Lambda function: `FAILURE_INJECTION_PARAM` set to the parameter name.
@@ -115,7 +164,7 @@ aws ssm put-parameter --region eu-west-1 --name failureLambdaConfig --type Strin
 AppConfig's native `AWS.AppConfig.FeatureFlags` profile type is a natural fit — each failure mode maps to a feature flag with typed attributes and built-in validation.
 
 1. Create an Application, Environment, and Configuration Profile (type: `AWS.AppConfig.FeatureFlags`) in the AppConfig console.
-2. Define flags for each failure mode (`latency`, `exception`, `statuscode`, `diskspace`, `denylist`) with their attributes.
+2. Define flags for each failure mode (`latency`, `exception`, `statuscode`, `diskspace`, `denylist`, `timeout`, `corruption`) with their attributes.
 3. Deploy a version of the configuration.
 4. Add the [AWS AppConfig Lambda extension layer](https://docs.aws.amazon.com/appconfig/latest/userguide/appconfig-integration-lambda-extensions.html) to your Lambda function.
 5. Add environment variables:
@@ -301,6 +350,9 @@ Inspired by Yan Cui's articles on latency injection for AWS Lambda (https://hack
 * Dual CJS/ESM package output.
 * Added `configProvider` option for custom config backends.
 * Exported `getConfig`, `validateFlagValue`, `resolveFailures`, `parseFlags`, and type definitions.
+* Added `timeout` and `corruption` failure modes.
+* Added event-based targeting via `match` conditions on any flag.
+* Added Middy middleware integration via `failure-lambda/middy` subpath export.
 * Updated examples to Node.js 22 and SDK v3.
 * SAM example supports both SSM and AppConfig via parameter.
 * Minimum Node.js version: 18.

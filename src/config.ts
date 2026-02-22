@@ -15,6 +15,8 @@ const KNOWN_FLAGS: ReadonlySet<string> = new Set<FailureMode>([
   "statuscode",
   "diskspace",
   "denylist",
+  "timeout",
+  "corruption",
 ]);
 
 const DEFAULT_CACHE_TTL_SECONDS = 60;
@@ -160,6 +162,54 @@ export function validateFlagValue(
           message: "must be an array of strings",
           value: raw.deny_list,
         });
+      }
+    }
+  }
+
+  if (mode === "timeout") {
+    if (raw.timeout_buffer_ms !== undefined) {
+      if (typeof raw.timeout_buffer_ms !== "number" || raw.timeout_buffer_ms < 0) {
+        errors.push({
+          field: `${mode}.timeout_buffer_ms`,
+          message: "must be a non-negative number",
+          value: raw.timeout_buffer_ms,
+        });
+      }
+    }
+  }
+
+  if (mode === "corruption") {
+    if (raw.body !== undefined && typeof raw.body !== "string") {
+      errors.push({
+        field: `${mode}.body`,
+        message: "must be a string",
+        value: raw.body,
+      });
+    }
+  }
+
+  if (raw.match !== undefined) {
+    if (!Array.isArray(raw.match)) {
+      errors.push({
+        field: `${mode}.match`,
+        message: "must be an array of { path, value } objects",
+        value: raw.match,
+      });
+    } else {
+      for (let i = 0; i < raw.match.length; i++) {
+        const condition = raw.match[i] as unknown;
+        if (
+          typeof condition !== "object" ||
+          condition === null ||
+          typeof (condition as Record<string, unknown>).path !== "string" ||
+          typeof (condition as Record<string, unknown>).value !== "string"
+        ) {
+          errors.push({
+            field: `${mode}.match[${i}]`,
+            message: "must be an object with string path and value fields",
+            value: condition,
+          });
+        }
       }
     }
   }
