@@ -289,6 +289,8 @@ export const handler = injectFailure(
 );
 ```
 
+**Note:** A custom `configProvider` bypasses the built-in SSM/AppConfig caching — your provider is called on every invocation. If you use this in production, implement your own caching.
+
 ### Dry Run Mode
 
 Log which failures would fire without actually injecting them. Useful for validating your configuration in production before enabling real fault injection:

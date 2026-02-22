@@ -10,10 +10,11 @@ export function injectDiskSpace(flag: FlagValue): void {
   const diskSpaceMB = flag.disk_space ?? 100;
   log({ mode: "diskspace", action: "inject", disk_space_mb: diskSpaceMB });
 
+  // bs=diskSpaceMB*1024 bytes per block, count=1024 blocks → diskSpaceMB * 1024 * 1024 = exact MB
   const result = spawnSync("dd", [
     "if=/dev/zero",
     `of=/tmp/${DISKSPACE_PREFIX}${Date.now()}.tmp`,
-    "count=1000",
+    "count=1024",
     `bs=${diskSpaceMB * 1024}`,
   ]);
 

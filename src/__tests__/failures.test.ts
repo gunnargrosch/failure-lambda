@@ -140,7 +140,7 @@ describe("injectDiskSpace", () => {
     expect(spawnMock).toHaveBeenCalledWith("dd", [
       "if=/dev/zero",
       expect.stringMatching(/^of=\/tmp\/diskspace-failure-\d+\.tmp$/),
-      "count=1000",
+      "count=1024",
       "bs=204800",
     ]);
   });
