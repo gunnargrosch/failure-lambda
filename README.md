@@ -1,21 +1,37 @@
-# Failure injection for AWS Lambda - failure-lambda
+# failure-lambda
 
-## Description
+[![npm version](https://img.shields.io/npm/v/failure-lambda.svg)](https://www.npmjs.com/package/failure-lambda)
+[![CI](https://github.com/gunnargrosch/failure-lambda/actions/workflows/ci.yml/badge.svg)](https://github.com/gunnargrosch/failure-lambda/actions/workflows/ci.yml)
+[![license](https://img.shields.io/npm/l/failure-lambda.svg)](LICENSE)
+[![node](https://img.shields.io/node/v/failure-lambda.svg)](package.json)
 
-`failure-lambda` is a Node.js module for injecting failure into [AWS Lambda](https://aws.amazon.com/lambda). It offers a simple failure injection wrapper for your Lambda handler where each failure mode is an independent feature flag: `latency`, `timeout`, `exception`, `denylist`, `diskspace`, `statuscode`, and `corruption`. Multiple failure modes can be active simultaneously. You control your failure injection using [SSM Parameter Store](https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-parameter-store.html) or [AWS AppConfig Feature Flags](https://docs.aws.amazon.com/appconfig/latest/userguide/appconfig-creating-configuration-and-profile-feature-flags.html).
+Failure injection for AWS Lambda — chaos engineering made simple. Wrap your handler and control failure injection with feature flags via SSM Parameter Store or AWS AppConfig.
 
-**v1.0.0** is a major release with breaking changes. See [Migration from 0.x](#migration-from-0x) below.
+> **v1.0.0** is a major release with breaking changes. See [Migration from 0.x](#migration-from-0x).
 
-## Requirements
+## Table of Contents
 
-- Node.js >= 18
-- AWS Lambda runtime `nodejs18.x`, `nodejs20.x`, or `nodejs22.x`
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Failure Modes](#failure-modes)
+- [Configuration](#configuration)
+- [Configuration Sources](#configuration-sources)
+- [Environment Variables](#environment-variables)
+- [Logging](#logging)
+- [Advanced Usage](#advanced-usage)
+- [Examples](#examples)
+- [Migration from 0.x](#migration-from-0x)
+- [Contributing](#contributing)
+- [Acknowledgments](#acknowledgments)
+- [License](#license)
 
 ## Installation
 
 ```bash
 npm install failure-lambda
 ```
+
+**Requirements:** Node.js >= 18 — Lambda runtimes `nodejs18.x`, `nodejs20.x`, or `nodejs22.x`.
 
 ## Quick Start
 
@@ -54,7 +70,7 @@ export const handler = injectFailure(async (event, context) => {
 
 ### Middy middleware
 
-If you use [Middy](https://middy.js.org/) (v4+), you can integrate via the `failure-lambda/middy` subpath export instead of wrapping your handler:
+If you use [Middy](https://middy.js.org/) (v4+), integrate via the `failure-lambda/middy` subpath export instead of wrapping your handler:
 
 ```ts
 import middy from "@middy/core";
@@ -67,11 +83,25 @@ export const handler = middy()
   });
 ```
 
-The middleware runs pre-handler failures (latency, timeout, etc.) in its `before` phase and post-handler failures (corruption) in its `after` phase. It supports the same `configProvider` option as the wrapper.
+The middleware runs pre-handler failures in its `before` phase and post-handler failures (corruption) in its `after` phase. It supports the same `configProvider` option as the wrapper.
 
-## Configuration Format
+## Failure Modes
 
-Each failure mode is an independent feature flag. Multiple modes can be enabled at the same time. This format is used by both SSM Parameter Store and AppConfig.
+| Mode | Description |
+|------|-------------|
+| `latency` | Adds random delay between `min_latency` and `max_latency` ms |
+| `timeout` | Sleeps until Lambda timeout minus a configurable buffer |
+| `exception` | Throws an error with a configurable message |
+| `statuscode` | Returns a response with a configurable HTTP status code, skipping the handler |
+| `diskspace` | Fills `/tmp` with a configurable amount of data |
+| `denylist` | Blocks outgoing network connections to hostnames matching regex patterns |
+| `corruption` | Replaces or mangles the handler's response body *(post-handler)* |
+
+Multiple modes can be active simultaneously. Each mode is an independent feature flag with its own `rate` (probability of injection).
+
+## Configuration
+
+Each failure mode is an independent feature flag. This format is used by both SSM Parameter Store and AppConfig.
 
 ```json
 {
@@ -142,9 +172,14 @@ This example only corrupts GET requests to the `prod` stage. Flags without `matc
 
 ## Configuration Sources
 
+Configuration is cached in memory to reduce latency and API calls. The cache persists within a single Lambda container, resets on cold starts, and defaults to a 60-second TTL (configurable via `FAILURE_CACHE_TTL`).
+
 ### SSM Parameter Store
 
-1. Create a parameter in SSM Parameter Store with the feature flag JSON:
+1. Create a parameter in SSM Parameter Store with the feature flag JSON (see example below).
+2. Add an environment variable to your Lambda function: `FAILURE_INJECTION_PARAM` set to the parameter name.
+3. Add `ssm:GetParameter` permission for your Lambda function.
+
 ```bash
 aws ssm put-parameter --region eu-west-1 --name failureLambdaConfig --type String --overwrite --value '{
   "latency": {"enabled": false, "rate": 1, "min_latency": 100, "max_latency": 400},
@@ -156,8 +191,6 @@ aws ssm put-parameter --region eu-west-1 --name failureLambdaConfig --type Strin
   "corruption": {"enabled": false, "rate": 1, "body": "{\"error\": \"corrupted\"}"}
 }'
 ```
-2. Add an environment variable to your Lambda function: `FAILURE_INJECTION_PARAM` set to the parameter name.
-3. Add `ssm:GetParameter` permission for your Lambda function.
 
 ### AWS AppConfig Feature Flags
 
@@ -167,23 +200,40 @@ AppConfig's native `AWS.AppConfig.FeatureFlags` profile type is a natural fit �
 2. Define flags for each failure mode (`latency`, `exception`, `statuscode`, `diskspace`, `denylist`, `timeout`, `corruption`) with their attributes.
 3. Deploy a version of the configuration.
 4. Add the [AWS AppConfig Lambda extension layer](https://docs.aws.amazon.com/appconfig/latest/userguide/appconfig-integration-lambda-extensions.html) to your Lambda function.
-5. Add environment variables:
-```
-FAILURE_APPCONFIG_APPLICATION: YOUR APPCONFIG APPLICATION
-FAILURE_APPCONFIG_ENVIRONMENT: YOUR APPCONFIG ENVIRONMENT
-FAILURE_APPCONFIG_CONFIGURATION: YOUR APPCONFIG CONFIGURATION PROFILE
-```
+5. Add environment variables: `FAILURE_APPCONFIG_APPLICATION`, `FAILURE_APPCONFIG_ENVIRONMENT`, and `FAILURE_APPCONFIG_CONFIGURATION` (see [Environment Variables](#environment-variables)).
 6. Add permissions for your Lambda function to access the AppConfig resources (`appconfig:StartConfigurationSession` and `appconfig:GetLatestConfiguration`).
 
 The AppConfig extension returns the feature flags in the same JSON shape the library expects — no transformation needed.
 
-## Configuration Caching
+## Environment Variables
 
-Configuration is cached in memory to reduce latency and API calls. The cache persists within a single Lambda container and resets on cold starts.
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `FAILURE_INJECTION_PARAM` | For SSM | SSM Parameter Store parameter name |
+| `FAILURE_APPCONFIG_APPLICATION` | For AppConfig | AppConfig application name |
+| `FAILURE_APPCONFIG_ENVIRONMENT` | For AppConfig | AppConfig environment name |
+| `FAILURE_APPCONFIG_CONFIGURATION` | For AppConfig | AppConfig configuration profile name |
+| `AWS_APPCONFIG_EXTENSION_HTTP_PORT` | No | AppConfig extension port (default: `2772`) |
+| `FAILURE_CACHE_TTL` | No | Config cache TTL in seconds (default: `60`, set to `0` to disable) |
 
-| Environment Variable | Default | Description |
-|---------------------|---------|-------------|
-| `FAILURE_CACHE_TTL` | `60` | Cache TTL in seconds. Set to `0` to disable caching. |
+## Logging
+
+All log output is structured JSON, making it easy to query in CloudWatch Logs Insights or any log aggregation tool. Every entry includes a `source` and `level` field, plus mode-specific details:
+
+```json
+{"source":"failure-lambda","level":"info","mode":"latency","action":"inject","latency_ms":237,"min_latency":100,"max_latency":400}
+{"source":"failure-lambda","level":"info","mode":"denylist","action":"block","hostname":"s3.us-east-1.amazonaws.com"}
+{"source":"failure-lambda","level":"info","mode":"statuscode","action":"inject","status_code":503}
+{"source":"failure-lambda","level":"warn","mode":"corruption","message":"response has no body field; wrapping in { body }"}
+```
+
+Example CloudWatch Logs Insights query:
+
+```
+fields @timestamp, mode, action
+| filter source = "failure-lambda"
+| sort @timestamp desc
+```
 
 ## Advanced Usage
 
@@ -242,20 +292,9 @@ const failures = resolveFailures(config);
 // ]
 ```
 
-## Environment Variables
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `FAILURE_INJECTION_PARAM` | For SSM | SSM Parameter Store parameter name |
-| `FAILURE_APPCONFIG_APPLICATION` | For AppConfig | AppConfig application name |
-| `FAILURE_APPCONFIG_ENVIRONMENT` | For AppConfig | AppConfig environment name |
-| `FAILURE_APPCONFIG_CONFIGURATION` | For AppConfig | AppConfig configuration profile name |
-| `AWS_APPCONFIG_EXTENSION_HTTP_PORT` | No | AppConfig extension port (default: `2772`) |
-| `FAILURE_CACHE_TTL` | No | Config cache TTL in seconds (default: `60`) |
-
 ## Examples
 
-In the `example` subfolder are sample applications with an AWS Lambda function, Amazon DynamoDB table, and SSM Parameter Store parameter. You can deploy using AWS SAM, AWS CDK, or Serverless Framework.
+The `example` directory contains sample applications with an AWS Lambda function, Amazon DynamoDB table, and SSM Parameter Store parameter. Deploy using AWS SAM, AWS CDK, or Serverless Framework.
 
 ### AWS SAM
 
@@ -297,7 +336,7 @@ sls deploy
 - **AWS SDK v3.** The library now uses `@aws-sdk/client-ssm` instead of `aws-sdk` v2. No user action needed — IAM permissions remain the same.
 - **`node-fetch` removed.** If your code depended on `node-fetch` being available transitively, install it separately.
 - **ESM-first package.** The package now ships as ESM with a CJS fallback. Both `import` and `require()` continue to work.
-- **New configuration format.** The flat `{isEnabled, failureMode, rate, ...}` config is replaced by a feature-flag model where each failure mode is an independent flag. See [Configuration Format](#configuration-format) above.
+- **New configuration format.** The flat `{isEnabled, failureMode, rate, ...}` config is replaced by a feature-flag model where each failure mode is an independent flag. See [Configuration](#configuration) above.
 
 ### New Features
 
@@ -312,6 +351,7 @@ sls deploy
 ### Config Migration
 
 Old format:
+
 ```json
 {"isEnabled": true, "failureMode": "latency", "rate": 1, "minLatency": 100, "maxLatency": 400}
 ```
@@ -331,88 +371,23 @@ npm install failure-lambda@1
 
 The wrapper API is unchanged — `failureLambda(handler)` works exactly as before. Update your SSM parameter or AppConfig configuration to the new format.
 
-## Notes
+## Contributing
 
-Inspired by Yan Cui's articles on latency injection for AWS Lambda (https://hackernoon.com/chaos-engineering-and-aws-lambda-latency-injection-ddeb4ff8d983) and Adrian Hornsby's chaos injection library for Python (https://github.com/adhorn/aws-lambda-chaos-injection/).
+Contributions are welcome. Please open an [issue](https://github.com/gunnargrosch/failure-lambda/issues) or submit a pull request.
+
+**Contributors:**
+
+- **Gunnar Grosch** — [GitHub](https://github.com/gunnargrosch) | [LinkedIn](https://www.linkedin.com/in/gunnargrosch/)
+- **Jason Barto** — [GitHub](https://github.com/jpbarto) | [LinkedIn](https://www.linkedin.com/in/jasonbarto)
+
+## Acknowledgments
+
+Inspired by [Yan Cui's articles on latency injection for AWS Lambda](https://hackernoon.com/chaos-engineering-and-aws-lambda-latency-injection-ddeb4ff8d983) and [Adrian Hornsby's chaos injection library for Python](https://github.com/adhorn/aws-lambda-chaos-injection/).
 
 ## Changelog
 
-### 2026-02-22 v1.0.0
-
-* Rewritten in TypeScript with full type definitions.
-* Feature flag configuration model — each failure mode is an independent flag.
-* Multiple simultaneous failures supported.
-* Native AppConfig Feature Flags (`AWS.AppConfig.FeatureFlags`) support.
-* Migrated from AWS SDK v2 to v3 (`@aws-sdk/client-ssm`).
-* Replaced `node-fetch` with native `fetch()` (Node.js 18+).
-* Added in-memory configuration caching with configurable TTL.
-* Added configuration validation with clear error messages.
-* Dual CJS/ESM package output.
-* Added `configProvider` option for custom config backends.
-* Exported `getConfig`, `validateFlagValue`, `resolveFailures`, `parseFlags`, and type definitions.
-* Added `timeout` and `corruption` failure modes.
-* Added event-based targeting via `match` conditions on any flag.
-* Added Middy middleware integration via `failure-lambda/middy` subpath export.
-* Updated examples to Node.js 22 and SDK v3.
-* SAM example supports both SSM and AppConfig via parameter.
-* Minimum Node.js version: 18.
-
-### 2022-02-14 v0.4.4
-
-* Switch to node-fetch@2.
-
-### 2022-02-14 v0.4.3
-
-* Updated dependencies.
-
-### 2021-03-16 v0.4.2
-
-* Puts the mitm object in the library global namespace so that it persists across function invocations.
-* Syntax formatting.
-
-### 2020-10-26 v0.4.1
-
-* Made AppConfig Lambda extension port configurable using environment variable.
-
-### 2020-10-25 v0.4.0
-
-* Added optional support for AWS AppConfig, allowing to validate failure configuration, deploy configuration using gradual or non-gradual deploy strategy, monitor deployed configuration with automatical rollback if CloudWatch Alarms is configured, and caching of configuration.
-* Hardcoded default configuration with `isEnabled: false`, to use if issues loading configuration from Parameter Store or AppConfig.
-
-### 2020-10-21 v0.3.1
-
-* Change mitm mode back to connect to fix issue with all connections being blocked.
-
-### 2020-08-24 v0.3.0
-
-* Changed mitm mode from connect to connection for quicker enable/disable of failure injection.
-* Renamed block list failure injection to denylist (breaking change for that failure mode).
-* Updated dependencies.
-
-### 2020-02-17 v0.2.0
-
-* Added block list failure.
-* Updated example application to store file in S3 and item in DynamoDB.
-
-### 2020-02-13 v0.1.1
-
-* Fixed issue with exception injection not throwing the exception.
-
-### 2019-12-30 v0.1.0
-
-* Added disk space failure.
-* Updated example application to store example file in tmp.
-
-### 2019-12-23 v0.0.1
-
-* Initial release
-
-## Contributors
-
-**Gunnar Grosch** - [GitHub](https://github.com/gunnargrosch) | [Twitter](https://twitter.com/gunnargrosch) | [LinkedIn](https://www.linkedin.com/in/gunnargrosch/)
-
-**Jason Barto** - [GitHub](https://github.com/jpbarto) | [Twitter](https://twitter.com/Jason_Barto) | [LinkedIn](https://www.linkedin.com/in/jasonbarto)
+See [CHANGELOG.md](CHANGELOG.md) for a detailed list of changes.
 
 ## License
 
-This code is made available under the MIT-0 license. See the LICENSE file.
+[MIT](LICENSE)

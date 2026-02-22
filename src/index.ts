@@ -1,17 +1,9 @@
 import type { Context, Callback } from "aws-lambda";
 import type { FailureFlagsConfig, LambdaHandler, FailureLambdaOptions } from "./types.js";
 import { getConfig, resolveFailures } from "./config.js";
-import {
-  injectLatency,
-  injectException,
-  injectStatusCode,
-  injectDiskSpace,
-  injectDenylist,
-  injectTimeout,
-  corruptResponse,
-  clearDenylist,
-} from "./failures/index.js";
-import { matchesConditions } from "./matching.js";
+import { error as logError } from "./log.js";
+import { clearDenylist } from "./failures/index.js";
+import { runPreHandlerInjections, runPostHandlerInjections } from "./orchestration.js";
 
 // Re-export types for consumers
 export type {
@@ -60,54 +52,18 @@ function injectFailure<TEvent = unknown, TResult = unknown>(
       const flagsConfig: FailureFlagsConfig = await configProvider();
       const failures = resolveFailures(flagsConfig);
 
-      // Clear denylist unless it's among active failures
-      if (!failures.some((f) => f.mode === "denylist")) {
-        clearDenylist();
+      const preResult = await runPreHandlerInjections<TEvent, TResult>(failures, event, context);
+      if (preResult) {
+        return preResult.shortCircuit;
       }
 
-      // --- Pre-handler injection ---
-      for (const failure of failures) {
-        if (failure.mode === "corruption") continue;
-        if (failure.flag.match && !matchesConditions(event, failure.flag.match)) continue;
-        if (Math.random() >= failure.rate) continue;
+      const result = await handler(event, context, callback);
 
-        switch (failure.mode) {
-          case "latency":
-            await injectLatency(failure.flag);
-            break;
-          case "timeout":
-            await injectTimeout(failure.flag, context);
-            break;
-          case "diskspace":
-            injectDiskSpace(failure.flag);
-            break;
-          case "denylist":
-            injectDenylist(failure.flag);
-            break;
-          case "statuscode":
-            return injectStatusCode(failure.flag) as unknown as TResult;
-          case "exception":
-            injectException(failure.flag);
-        }
-      }
-
-      // --- Handler ---
-      let result: unknown = await handler(event, context, callback);
-
-      // --- Post-handler injection ---
-      for (const failure of failures) {
-        if (failure.mode !== "corruption") continue;
-        if (failure.flag.match && !matchesConditions(event, failure.flag.match)) continue;
-        if (Math.random() >= failure.rate) continue;
-
-        result = corruptResponse(failure.flag, result);
-      }
-
-      return result as TResult;
-    } catch (error) {
-      console.error("[failure-lambda]", error);
+      return runPostHandlerInjections(failures, event, result) as TResult;
+    } catch (err) {
+      logError({ action: "error", message: err instanceof Error ? err.message : String(err) });
       clearDenylist();
-      throw error;
+      throw err;
     }
   };
 }

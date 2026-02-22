@@ -14,6 +14,7 @@ export function getNestedValue(obj: unknown, path: string): unknown {
 export function matchesConditions(event: unknown, conditions: MatchCondition[]): boolean {
   return conditions.every(({ path, value }) => {
     const actual = getNestedValue(event, path);
+    if (actual === null || actual === undefined) return false;
     return String(actual) === value;
   });
 }

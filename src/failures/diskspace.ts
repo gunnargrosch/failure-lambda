@@ -1,9 +1,10 @@
 import { spawnSync } from "node:child_process";
 import type { FlagValue } from "../types.js";
+import { log, error } from "../log.js";
 
 export function injectDiskSpace(flag: FlagValue): void {
   const diskSpaceMB = flag.disk_space ?? 100;
-  console.log(`[failure-lambda] Injecting disk space: ${diskSpaceMB}MB`);
+  log({ mode: "diskspace", action: "inject", disk_space_mb: diskSpaceMB });
 
   const result = spawnSync("dd", [
     "if=/dev/zero",
@@ -13,6 +14,9 @@ export function injectDiskSpace(flag: FlagValue): void {
   ]);
 
   if (result.error) {
-    console.error("[failure-lambda] Failed to inject disk space:", result.error);
+    error({ mode: "diskspace", action: "error", message: result.error.message });
+  } else if (result.status !== 0) {
+    const stderr = result.stderr?.toString().trim();
+    error({ mode: "diskspace", action: "error", message: `dd exited with status ${result.status}`, stderr });
   }
 }

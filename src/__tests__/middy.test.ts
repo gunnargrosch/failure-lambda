@@ -41,7 +41,7 @@ describe("failureLambdaMiddleware", () => {
       const request = { event: {}, context: mockContext, internal: {} };
       await middleware.before(request);
 
-      expect(logSpy).toHaveBeenCalledWith("[failure-lambda] Injecting 0ms latency");
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('"latency_ms":0'));
     });
 
     it("should short-circuit on statuscode by setting response", async () => {

@@ -51,7 +51,7 @@ describe("injectLatency", () => {
 
     await injectLatency(flag);
 
-    expect(logSpy).toHaveBeenCalledWith("[failure-lambda] Injecting 300ms latency");
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('"latency_ms":300'));
   }, 1000);
 
   it("should default to 0 when min/max are undefined", async () => {
@@ -60,7 +60,7 @@ describe("injectLatency", () => {
 
     await injectLatency(flag);
 
-    expect(logSpy).toHaveBeenCalledWith("[failure-lambda] Injecting 0ms latency");
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('"latency_ms":0'));
   });
 });
 
@@ -88,7 +88,7 @@ describe("injectException", () => {
     };
 
     expect(() => injectException(flag)).toThrow();
-    expect(logSpy).toHaveBeenCalledWith("[failure-lambda] Injecting exception: Test");
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('"mode":"exception"'));
   });
 });
 
@@ -118,7 +118,7 @@ describe("injectStatusCode", () => {
     };
 
     injectStatusCode(flag);
-    expect(logSpy).toHaveBeenCalledWith("[failure-lambda] Injecting status code: 429");
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('"status_code":429'));
   });
 });
 
@@ -183,10 +183,28 @@ describe("injectDiskSpace", () => {
 
     injectDiskSpace(flag);
 
-    expect(errorSpy).toHaveBeenCalledWith(
-      "[failure-lambda] Failed to inject disk space:",
-      spawnError
-    );
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('"mode":"diskspace"'));
+  });
+
+  it("should log error when dd exits with non-zero status", async () => {
+    const { spawnSync } = await import("node:child_process");
+    const spawnMock = vi.mocked(spawnSync);
+    spawnMock.mockReturnValueOnce({
+      pid: 0,
+      output: [],
+      stdout: Buffer.from(""),
+      stderr: Buffer.from("No space left on device"),
+      status: 1,
+      signal: null,
+    });
+
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const { injectDiskSpace } = await import("../failures/diskspace.js");
+    injectDiskSpace({ enabled: true, disk_space: 50 });
+
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('"dd exited with status 1"'));
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("No space left on device"));
   });
 });
 
@@ -205,9 +223,7 @@ describe("injectTimeout", () => {
     vi.advanceTimersByTime(4500);
     await promise;
 
-    expect(logSpy).toHaveBeenCalledWith(
-      "[failure-lambda] Injecting timeout: sleeping 4500ms (buffer: 500ms, remaining: 5000ms)",
-    );
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('"sleep_ms":4500'));
 
     vi.useRealTimers();
   });
@@ -226,9 +242,7 @@ describe("injectTimeout", () => {
     vi.advanceTimersByTime(3000);
     await promise;
 
-    expect(logSpy).toHaveBeenCalledWith(
-      "[failure-lambda] Injecting timeout: sleeping 3000ms (buffer: 0ms, remaining: 3000ms)",
-    );
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('"sleep_ms":3000'));
 
     vi.useRealTimers();
   });
@@ -247,9 +261,7 @@ describe("injectTimeout", () => {
     await vi.advanceTimersByTimeAsync(0);
     await promise;
 
-    expect(logSpy).toHaveBeenCalledWith(
-      "[failure-lambda] Injecting timeout: sleeping 0ms (buffer: 500ms, remaining: 100ms)",
-    );
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('"sleep_ms":0'));
 
     vi.useRealTimers();
   });
@@ -263,16 +275,18 @@ describe("corruptResponse", () => {
     const result = corruptResponse(flag, { statusCode: 200, body: "original" });
 
     expect(result).toEqual({ statusCode: 200, body: '{"error": "corrupted"}' });
-    expect(logSpy).toHaveBeenCalledWith("[failure-lambda] Injecting response corruption: replacing body");
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('"method":"replace"'));
   });
 
-  it("should return body string when result has no body field", () => {
+  it("should wrap in { body } when result has no body field", () => {
     vi.spyOn(console, "log").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const flag: FlagValue = { enabled: true, body: '{"error": "corrupted"}' };
 
     const result = corruptResponse(flag, "raw string");
 
-    expect(result).toBe('{"error": "corrupted"}');
+    expect(result).toEqual({ body: '{"error": "corrupted"}' });
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('"response has no body field'));
   });
 
   it("should mangle body when no replacement body is configured", () => {
@@ -290,14 +304,16 @@ describe("corruptResponse", () => {
     expect((result.body as string)).toContain("\uFFFD");
   });
 
-  it("should return result as-is when mangling and result has no body", () => {
+  it("should return result as-is when mangling and result has no body, with warning", () => {
     vi.spyOn(console, "log").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const flag: FlagValue = { enabled: true };
 
     const original = { statusCode: 200, data: "no body field" };
     const result = corruptResponse(flag, original);
 
     expect(result).toEqual(original);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('"response has no string body field to mangle'));
   });
 
   it("should handle empty body string in mangle mode", () => {
@@ -309,12 +325,24 @@ describe("corruptResponse", () => {
     expect(result.body).toBe("");
   });
 
-  it("should handle null result in replace mode", () => {
+  it("should wrap in { body } for null result in replace mode", () => {
     vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "warn").mockImplementation(() => {});
     const flag: FlagValue = { enabled: true, body: "replaced" };
 
     const result = corruptResponse(flag, null);
 
-    expect(result).toBe("replaced");
+    expect(result).toEqual({ body: "replaced" });
+  });
+
+  it("should warn and return unchanged for primitive result in mangle mode", () => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const flag: FlagValue = { enabled: true };
+
+    const result = corruptResponse(flag, 42);
+
+    expect(result).toBe(42);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('"response has no string body field to mangle'));
   });
 });

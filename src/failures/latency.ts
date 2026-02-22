@@ -1,4 +1,5 @@
 import type { FlagValue } from "../types.js";
+import { log } from "../log.js";
 
 export async function injectLatency(flag: FlagValue): Promise<void> {
   const minLatency = flag.min_latency ?? 0;
@@ -6,6 +7,6 @@ export async function injectLatency(flag: FlagValue): Promise<void> {
   const latencyRange = maxLatency - minLatency;
   const injectedLatency = Math.floor(minLatency + Math.random() * latencyRange);
 
-  console.log(`[failure-lambda] Injecting ${injectedLatency}ms latency`);
+  log({ mode: "latency", action: "inject", latency_ms: injectedLatency, min_latency: minLatency, max_latency: maxLatency });
   await new Promise<void>((resolve) => setTimeout(resolve, injectedLatency));
 }

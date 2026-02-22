@@ -1,5 +1,6 @@
 import dns from "node:dns";
 import type { FlagValue } from "../types.js";
+import { log, warn } from "../log.js";
 
 /** Capture the original dns.lookup once at module load (once per Lambda cold start) */
 const originalLookup = dns.lookup;
@@ -21,11 +22,16 @@ export function clearDenylist(): void {
 
 export function injectDenylist(flag: FlagValue): void {
   const denylistPatterns = flag.deny_list ?? [];
-  console.log(
-    `[failure-lambda] Injecting denylist for: ${denylistPatterns.join(", ")}`,
-  );
+  log({ mode: "denylist", action: "inject", patterns: denylistPatterns });
 
-  activePatterns = denylistPatterns.map((pattern) => new RegExp(pattern));
+  activePatterns = [];
+  for (const pattern of denylistPatterns) {
+    try {
+      activePatterns.push(new RegExp(pattern));
+    } catch (e) {
+      warn({ mode: "denylist", action: "error", message: `invalid regex "${pattern}"`, error: (e as Error).message });
+    }
+  }
 
   if (!isActive) {
     dns.lookup = function blockedLookup(
@@ -40,7 +46,7 @@ export function injectDenylist(flag: FlagValue): void {
       const rest = args.slice(0, -1);
 
       if (activePatterns.some((regex) => regex.test(hostname))) {
-        console.log(`[failure-lambda] Blocked connection to ${hostname}`);
+        log({ mode: "denylist", action: "block", hostname });
         const err = new Error(
           `getaddrinfo ENOTFOUND ${hostname}`,
         ) as NodeJS.ErrnoException & { hostname?: string };

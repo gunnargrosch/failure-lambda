@@ -1,15 +1,17 @@
 import type { FlagValue } from "../types.js";
+import { log, warn } from "../log.js";
 
 export function corruptResponse(flag: FlagValue, result: unknown): unknown {
   if (flag.body !== undefined) {
-    console.log("[failure-lambda] Injecting response corruption: replacing body");
+    log({ mode: "corruption", action: "inject", method: "replace" });
     if (typeof result === "object" && result !== null && "body" in result) {
       return { ...result, body: flag.body };
     }
-    return flag.body;
+    warn({ mode: "corruption", message: "response has no body field; wrapping in { body }" });
+    return { body: flag.body };
   }
 
-  console.log("[failure-lambda] Injecting response corruption: mangling body");
+  log({ mode: "corruption", action: "inject", method: "mangle" });
   if (typeof result === "object" && result !== null && "body" in result) {
     const obj = result as Record<string, unknown>;
     if (typeof obj.body === "string") {
@@ -17,6 +19,7 @@ export function corruptResponse(flag: FlagValue, result: unknown): unknown {
     }
   }
 
+  warn({ mode: "corruption", message: "response has no string body field to mangle; returning unchanged" });
   return result;
 }
 

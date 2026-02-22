@@ -1,17 +1,7 @@
 import type { Context } from "aws-lambda";
 import type { FailureLambdaOptions, ResolvedFailure } from "./types.js";
 import { getConfig, resolveFailures } from "./config.js";
-import {
-  injectLatency,
-  injectException,
-  injectStatusCode,
-  injectDiskSpace,
-  injectDenylist,
-  injectTimeout,
-  corruptResponse,
-  clearDenylist,
-} from "./failures/index.js";
-import { matchesConditions } from "./matching.js";
+import { runPreHandlerInjections, runPostHandlerInjections } from "./orchestration.js";
 
 interface MiddyRequest<TEvent = unknown, TResult = unknown> {
   event: TEvent;
@@ -37,46 +27,24 @@ export function failureLambdaMiddleware<TEvent = unknown, TResult = unknown>(
       // Store resolved failures for after phase
       request.internal = { ...request.internal, failureLambdaFailures: failures };
 
-      if (!failures.some((f) => f.mode === "denylist")) {
-        clearDenylist();
-      }
-
-      for (const failure of failures) {
-        if (failure.mode === "corruption") continue;
-        if (failure.flag.match && !matchesConditions(request.event, failure.flag.match)) continue;
-        if (Math.random() >= failure.rate) continue;
-
-        switch (failure.mode) {
-          case "latency":
-            await injectLatency(failure.flag);
-            break;
-          case "timeout":
-            await injectTimeout(failure.flag, request.context);
-            break;
-          case "diskspace":
-            injectDiskSpace(failure.flag);
-            break;
-          case "denylist":
-            injectDenylist(failure.flag);
-            break;
-          case "statuscode":
-            request.response = injectStatusCode(failure.flag) as unknown as TResult;
-            return request.response;
-          case "exception":
-            injectException(failure.flag);
-        }
+      const preResult = await runPreHandlerInjections<TEvent, TResult>(
+        failures,
+        request.event,
+        request.context,
+      );
+      if (preResult) {
+        request.response = preResult.shortCircuit;
+        return preResult.shortCircuit;
       }
     },
     after: async (request) => {
       const failures = (request.internal?.failureLambdaFailures ?? []) as ResolvedFailure[];
 
-      for (const failure of failures) {
-        if (failure.mode !== "corruption") continue;
-        if (failure.flag.match && !matchesConditions(request.event, failure.flag.match)) continue;
-        if (Math.random() >= failure.rate) continue;
-
-        request.response = corruptResponse(failure.flag, request.response) as TResult;
-      }
+      request.response = runPostHandlerInjections(
+        failures,
+        request.event,
+        request.response,
+      ) as TResult;
     },
   };
 }

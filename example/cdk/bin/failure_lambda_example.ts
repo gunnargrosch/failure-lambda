@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-import 'source-map-support/register';
 import * as cdk from 'aws-cdk-lib';
 import { FailureLambdaExampleStack } from '../lib/failure_lambda_example-stack';
 

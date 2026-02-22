@@ -142,6 +142,24 @@ describe("validateFlagValue", () => {
     expect(errors[0].field).toBe("denylist.deny_list");
   });
 
+  it("should return error for invalid regex in deny_list", () => {
+    const errors = validateFlagValue("denylist", {
+      enabled: true,
+      deny_list: ["valid\\.pattern", "(invalid["],
+    });
+    expect(errors).toHaveLength(1);
+    expect(errors[0].field).toBe("denylist.deny_list[1]");
+    expect(errors[0].message).toBe("invalid regular expression");
+  });
+
+  it("should accept valid regex patterns in deny_list", () => {
+    const errors = validateFlagValue("denylist", {
+      enabled: true,
+      deny_list: ["s3\\..*\\.amazonaws\\.com", "^dynamodb\\."],
+    });
+    expect(errors).toHaveLength(0);
+  });
+
   it("should return error for non-string exception_msg", () => {
     const errors = validateFlagValue("exception", { enabled: true, exception_msg: 123 });
     expect(errors).toHaveLength(1);
@@ -579,7 +597,7 @@ describe("config caching", () => {
     await getConfig();
 
     expect(ssmMock.commandCalls(GetParameterCommand)).toHaveLength(1);
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("Invalid FAILURE_CACHE_TTL"));
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("FAILURE_CACHE_TTL"));
   });
 
   it("should force re-fetch after clearConfigCache", async () => {

@@ -8,6 +8,7 @@ import type {
   ConfigValidationError,
 } from "./types.js";
 import { DEFAULT_FLAGS_CONFIG, FAILURE_MODE_ORDER } from "./types.js";
+import { warn, error } from "./log.js";
 
 const KNOWN_FLAGS: ReadonlySet<string> = new Set<FailureMode>([
   "latency",
@@ -41,9 +42,7 @@ function getCacheTtlMs(): number {
   }
   const parsed = Number(envValue);
   if (Number.isNaN(parsed) || parsed < 0) {
-    console.warn(
-      `[failure-lambda] Invalid FAILURE_CACHE_TTL="${envValue}", using default ${DEFAULT_CACHE_TTL_SECONDS}s`
-    );
+    warn({ action: "config", message: `invalid FAILURE_CACHE_TTL="${envValue}", using default ${DEFAULT_CACHE_TTL_SECONDS}s` });
     return DEFAULT_CACHE_TTL_SECONDS * 1000;
   }
   return parsed * 1000;
@@ -162,6 +161,18 @@ export function validateFlagValue(
           message: "must be an array of strings",
           value: raw.deny_list,
         });
+      } else {
+        for (let i = 0; i < raw.deny_list.length; i++) {
+          try {
+            new RegExp(raw.deny_list[i] as string);
+          } catch {
+            errors.push({
+              field: `${mode}.deny_list[${i}]`,
+              message: "invalid regular expression",
+              value: raw.deny_list[i],
+            });
+          }
+        }
       }
     }
   }
@@ -230,25 +241,19 @@ export function parseFlags(raw: Record<string, unknown>): FailureFlagsConfig {
     const flagRaw = raw[mode];
 
     if (typeof flagRaw !== "object" || flagRaw === null || Array.isArray(flagRaw)) {
-      console.warn(
-        `[failure-lambda] Config validation: ${mode} must be an object, skipping`
-      );
+      warn({ action: "config", mode, message: "must be an object, skipping" });
       continue;
     }
 
     const flagObj = flagRaw as Record<string, unknown>;
-    const errors = validateFlagValue(mode, flagObj);
+    const validationErrors = validateFlagValue(mode, flagObj);
 
-    if (errors.length > 0) {
-      for (const error of errors) {
-        console.warn(
-          `[failure-lambda] Config validation: ${error.field} ${error.message} (got: ${JSON.stringify(error.value)})`
-        );
+    if (validationErrors.length > 0) {
+      for (const validationError of validationErrors) {
+        warn({ action: "config", field: validationError.field, message: validationError.message, value: validationError.value });
       }
-      if (errors.some((e) => e.field.endsWith(".enabled"))) {
-        console.warn(
-          `[failure-lambda] Skipping ${mode} flag due to invalid enabled field`
-        );
+      if (validationErrors.some((e) => e.field.endsWith(".enabled"))) {
+        warn({ action: "config", mode, message: "skipping flag due to invalid enabled field" });
         continue;
       }
     }
@@ -345,8 +350,8 @@ export async function getConfig(): Promise<FailureFlagsConfig> {
     };
 
     return config;
-  } catch (error) {
-    console.error("[failure-lambda] Error fetching config:", error);
+  } catch (err) {
+    error({ action: "config", message: "error fetching config", error: String(err) });
     return { ...DEFAULT_FLAGS_CONFIG };
   }
 }

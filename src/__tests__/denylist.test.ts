@@ -90,14 +90,14 @@ describe("injectDenylist", () => {
     // first.example.com should no longer trigger our blocker log
     await lookupAsync("first.example.com").catch(() => {});
     expect(logSpy).not.toHaveBeenCalledWith(
-      "[failure-lambda] Blocked connection to first.example.com",
+      expect.stringContaining('"hostname":"first.example.com"'),
     );
 
     // second.example.com should be blocked by our blocker
     const err2 = await lookupAsync("second.example.com").catch((e) => e);
     expect(err2.code).toBe("ENOTFOUND");
     expect(logSpy).toHaveBeenCalledWith(
-      "[failure-lambda] Blocked connection to second.example.com",
+      expect.stringContaining('"hostname":"second.example.com"'),
     );
   });
 
@@ -157,7 +157,37 @@ describe("injectDenylist", () => {
     injectDenylist({ enabled: true, deny_list: ["blocked\\.com"] });
     await lookupAsync("blocked.com").catch(() => {});
 
-    expect(logSpy).toHaveBeenCalledWith("[failure-lambda] Blocked connection to blocked.com");
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('"hostname":"blocked.com"'));
+  });
+
+  it("should skip invalid regex patterns and log warning", async () => {
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    injectDenylist({ enabled: true, deny_list: ["(invalid[", "blocked\\.com"] });
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('"invalid regex'),
+    );
+
+    // Valid pattern should still work
+    const err = await lookupAsync("blocked.com").catch((e) => e);
+    expect(err.code).toBe("ENOTFOUND");
+
+    // Non-matching should pass through
+    const result = await lookupAsync("localhost");
+    expect(result.address).toBeDefined();
+  });
+
+  it("should not crash when all patterns are invalid", async () => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    injectDenylist({ enabled: true, deny_list: ["(invalid[", "also(bad"] });
+
+    // Nothing should be blocked
+    const result = await lookupAsync("localhost");
+    expect(result.address).toBeDefined();
   });
 
   it("should log injected patterns", () => {
@@ -169,7 +199,7 @@ describe("injectDenylist", () => {
     });
 
     expect(logSpy).toHaveBeenCalledWith(
-      "[failure-lambda] Injecting denylist for: s3\\..*\\.amazonaws\\.com, dynamodb\\..*",
+      expect.stringContaining('"mode":"denylist"'),
     );
   });
 });

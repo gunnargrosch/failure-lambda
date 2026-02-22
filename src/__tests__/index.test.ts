@@ -126,7 +126,7 @@ describe("injectFailure wrapper", () => {
       });
 
       const result = await wrapped({}, mockContext, mockCallback);
-      expect(logSpy).toHaveBeenCalledWith("[failure-lambda] Injecting 0ms latency");
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('"latency_ms":0'));
       expect(handler).toHaveBeenCalled();
       expect(result).toEqual({ statusCode: 200 });
     });
@@ -191,8 +191,8 @@ describe("injectFailure wrapper", () => {
 
       const result = await wrapped({}, mockContext, mockCallback);
 
-      expect(logSpy).toHaveBeenCalledWith("[failure-lambda] Injecting 0ms latency");
-      expect(logSpy).toHaveBeenCalledWith("[failure-lambda] Injecting disk space: 50MB");
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('"latency_ms":0'));
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('"disk_space_mb":50'));
       expect(handler).toHaveBeenCalled();
       expect(result).toEqual({ statusCode: 200 });
     });
@@ -211,7 +211,7 @@ describe("injectFailure wrapper", () => {
       const result = await wrapped({}, mockContext, mockCallback);
 
       // Latency should have been injected first
-      expect(logSpy).toHaveBeenCalledWith("[failure-lambda] Injecting 0ms latency");
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('"latency_ms":0'));
       // Then statuscode short-circuits
       expect(result).toEqual({ statusCode: 503 });
       expect(handler).not.toHaveBeenCalled();
@@ -231,7 +231,7 @@ describe("injectFailure wrapper", () => {
       await expect(wrapped({}, mockContext, mockCallback)).rejects.toThrow("Boom");
 
       // Latency should have been injected first
-      expect(logSpy).toHaveBeenCalledWith("[failure-lambda] Injecting 0ms latency");
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('"latency_ms":0'));
       expect(handler).not.toHaveBeenCalled();
     });
 
@@ -309,8 +309,45 @@ describe("injectFailure wrapper", () => {
       const result = await promise;
 
       expect(logSpy).toHaveBeenCalledWith(
-        expect.stringContaining("[failure-lambda] Injecting timeout"),
+        expect.stringContaining('"mode":"timeout"'),
       );
+      expect(handler).toHaveBeenCalled();
+      expect(result).toEqual({ statusCode: 200 });
+
+      vi.useRealTimers();
+    });
+
+    it("should account for time consumed by earlier modes like latency", async () => {
+      vi.useFakeTimers();
+      vi.spyOn(Math, "random").mockReturnValue(0);
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+      // Date.now() advances with fake timers, so remaining time decreases naturally
+      const startTime = Date.now();
+      const contextWithDecreasingTime = {
+        ...mockContext,
+        getRemainingTimeInMillis: () => 30000 - (Date.now() - startTime),
+      };
+
+      const handler = vi.fn().mockResolvedValue({ statusCode: 200 });
+      const wrapped = injectFailure(handler, {
+        configProvider: createConfigProvider({
+          latency: { enabled: true, rate: 1, min_latency: 1000, max_latency: 1000 },
+          timeout: { enabled: true, rate: 1, timeout_buffer_ms: 500 },
+        }),
+      });
+
+      const promise = wrapped({}, contextWithDecreasingTime, mockCallback);
+
+      // Advance past latency (1000ms), then timeout reads remaining as 29000
+      // and sleeps for 29000 - 500 = 28500ms. Total: 1000 + 28500 = 29500ms.
+      await vi.advanceTimersByTimeAsync(29500);
+      const result = await promise;
+
+      // Verify both modes were injected
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('"mode":"latency"'));
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('"mode":"timeout"'));
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('"sleep_ms":28500'));
       expect(handler).toHaveBeenCalled();
       expect(result).toEqual({ statusCode: 200 });
 
@@ -365,7 +402,7 @@ describe("injectFailure wrapper", () => {
 
       const result = await wrapped({}, mockContext, mockCallback);
 
-      expect(logSpy).toHaveBeenCalledWith("[failure-lambda] Injecting 0ms latency");
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('"latency_ms":0'));
       expect(handler).toHaveBeenCalled();
       expect(result).toEqual({ statusCode: 200, body: "corrupted" });
     });
@@ -515,5 +552,17 @@ describe("matchesConditions", () => {
 
   it("should coerce non-string values to strings for comparison", () => {
     expect(matchesConditions({ count: 42 }, [{ path: "count", value: "42" }])).toBe(true);
+  });
+
+  it("should not match null actual value against 'null' string", () => {
+    expect(matchesConditions({ foo: null }, [{ path: "foo", value: "null" }])).toBe(false);
+  });
+
+  it("should not match undefined (missing path) against 'undefined' string", () => {
+    expect(matchesConditions({}, [{ path: "missing", value: "undefined" }])).toBe(false);
+  });
+
+  it("should not match when path resolves to undefined", () => {
+    expect(matchesConditions({ a: { b: 1 } }, [{ path: "a.c", value: "1" }])).toBe(false);
   });
 });
