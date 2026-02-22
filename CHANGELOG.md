@@ -20,8 +20,10 @@ Rewritten in TypeScript with a feature flag configuration model.
 - Exported `getConfig`, `validateFlagValue`, `resolveFailures`, `parseFlags`, and type definitions
 - `timeout` failure mode — sleeps until Lambda timeout minus configurable buffer
 - `corruption` failure mode — replaces or mangles handler response body (post-handler)
-- Event-based targeting via `match` conditions on any flag
+- Event-based targeting via `match` conditions on any flag with `eq`, `exists`, `startsWith`, and `regex` operators
 - Middy middleware integration via `failure-lambda/middy` subpath export
+- `FAILURE_LAMBDA_DISABLED` environment variable — set to `"true"` to bypass all injection without changing config
+- `dryRun` option — logs which failures would fire without actually injecting them
 - Structured JSON logging — all log output is machine-parseable with `source`, `level`, `mode`, and `action` fields
 - GitHub Actions CI workflow with Node.js 18/20/22 matrix
 - SAM example supports both SSM and AppConfig via parameter

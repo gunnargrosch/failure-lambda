@@ -203,23 +203,54 @@ export function validateFlagValue(
     if (!Array.isArray(raw.match)) {
       errors.push({
         field: `${mode}.match`,
-        message: "must be an array of { path, value } objects",
+        message: "must be an array of match condition objects",
         value: raw.match,
       });
     } else {
+      const VALID_OPERATORS = new Set(["eq", "exists", "startsWith", "regex"]);
       for (let i = 0; i < raw.match.length; i++) {
         const condition = raw.match[i] as unknown;
-        if (
-          typeof condition !== "object" ||
-          condition === null ||
-          typeof (condition as Record<string, unknown>).path !== "string" ||
-          typeof (condition as Record<string, unknown>).value !== "string"
-        ) {
+        if (typeof condition !== "object" || condition === null) {
           errors.push({
             field: `${mode}.match[${i}]`,
-            message: "must be an object with string path and value fields",
+            message: "must be an object with a string path field",
             value: condition,
           });
+          continue;
+        }
+        const cond = condition as Record<string, unknown>;
+        if (typeof cond.path !== "string") {
+          errors.push({
+            field: `${mode}.match[${i}].path`,
+            message: "must be a string",
+            value: cond.path,
+          });
+        }
+        const operator = (cond.operator as string) ?? "eq";
+        if (cond.operator !== undefined && !VALID_OPERATORS.has(operator)) {
+          errors.push({
+            field: `${mode}.match[${i}].operator`,
+            message: `must be one of: eq, exists, startsWith, regex`,
+            value: cond.operator,
+          });
+        }
+        if (operator !== "exists" && typeof cond.value !== "string") {
+          errors.push({
+            field: `${mode}.match[${i}].value`,
+            message: "must be a string (required for all operators except 'exists')",
+            value: cond.value,
+          });
+        }
+        if (operator === "regex" && typeof cond.value === "string") {
+          try {
+            new RegExp(cond.value);
+          } catch {
+            errors.push({
+              field: `${mode}.match[${i}].value`,
+              message: "invalid regular expression",
+              value: cond.value,
+            });
+          }
         }
       }
     }

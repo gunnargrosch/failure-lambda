@@ -228,17 +228,16 @@ describe("validateFlagValue", () => {
       enabled: true,
       match: [{ value: "GET" }],
     });
-    expect(errors).toHaveLength(1);
-    expect(errors[0].field).toBe("latency.match[0]");
+    expect(errors.some((e) => e.field === "latency.match[0].path")).toBe(true);
   });
 
-  it("should return error for match condition missing value", () => {
+  it("should return error for match condition missing value with eq operator", () => {
     const errors = validateFlagValue("latency", {
       enabled: true,
       match: [{ path: "foo" }],
     });
     expect(errors).toHaveLength(1);
-    expect(errors[0].field).toBe("latency.match[0]");
+    expect(errors[0].field).toBe("latency.match[0].value");
   });
 
   it("should return error for non-object match condition", () => {
@@ -254,6 +253,63 @@ describe("validateFlagValue", () => {
     const errors = validateFlagValue("exception", {
       enabled: true,
       match: [{ path: "method", value: "GET" }],
+    });
+    expect(errors).toHaveLength(0);
+  });
+
+  it("should accept valid match operators", () => {
+    for (const operator of ["eq", "exists", "startsWith", "regex"]) {
+      const condition = operator === "exists"
+        ? { path: "foo", operator }
+        : { path: "foo", operator, value: "bar" };
+      const errors = validateFlagValue("latency", {
+        enabled: true,
+        match: [condition],
+      });
+      expect(errors).toHaveLength(0);
+    }
+  });
+
+  it("should return error for unknown match operator", () => {
+    const errors = validateFlagValue("latency", {
+      enabled: true,
+      match: [{ path: "foo", operator: "greaterThan", value: "5" }],
+    });
+    expect(errors).toHaveLength(1);
+    expect(errors[0].field).toBe("latency.match[0].operator");
+  });
+
+  it("should not require value for exists operator", () => {
+    const errors = validateFlagValue("latency", {
+      enabled: true,
+      match: [{ path: "foo", operator: "exists" }],
+    });
+    expect(errors).toHaveLength(0);
+  });
+
+  it("should require value for startsWith operator", () => {
+    const errors = validateFlagValue("latency", {
+      enabled: true,
+      match: [{ path: "foo", operator: "startsWith" }],
+    });
+    expect(errors).toHaveLength(1);
+    expect(errors[0].field).toBe("latency.match[0].value");
+  });
+
+  it("should return error for invalid regex in match value", () => {
+    const errors = validateFlagValue("latency", {
+      enabled: true,
+      match: [{ path: "foo", operator: "regex", value: "(invalid[" }],
+    });
+    expect(errors).toHaveLength(1);
+    expect(errors[0].field).toBe("latency.match[0].value");
+    expect(errors[0].message).toBe("invalid regular expression");
+  });
+
+  it("should accept valid regex in match value", () => {
+    const errors = validateFlagValue("latency", {
+      enabled: true,
+      match: [{ path: "foo", operator: "regex", value: "^(GET|POST)$" }],
     });
     expect(errors).toHaveLength(0);
   });

@@ -11,6 +11,7 @@ import {
   clearDenylist,
 } from "./failures/index.js";
 import { matchesConditions } from "./matching.js";
+import { log } from "./log.js";
 
 export interface ShortCircuitResult<TResult = unknown> {
   shortCircuit: TResult;
@@ -26,8 +27,9 @@ export async function runPreHandlerInjections<TEvent = unknown, TResult = unknow
   failures: ResolvedFailure[],
   event: TEvent,
   context: Context,
+  dryRun = false,
 ): Promise<ShortCircuitResult<TResult> | undefined> {
-  if (!failures.some((f) => f.mode === "denylist")) {
+  if (!dryRun && !failures.some((f) => f.mode === "denylist")) {
     clearDenylist();
   }
 
@@ -35,6 +37,11 @@ export async function runPreHandlerInjections<TEvent = unknown, TResult = unknow
     if (failure.mode === "corruption") continue;
     if (failure.flag.match && !matchesConditions(event, failure.flag.match)) continue;
     if (Math.random() >= failure.rate) continue;
+
+    if (dryRun) {
+      log({ mode: failure.mode, action: "dryrun", rate: failure.rate });
+      continue;
+    }
 
     switch (failure.mode) {
       case "latency":
@@ -68,6 +75,7 @@ export function runPostHandlerInjections<TEvent = unknown, TResult = unknown>(
   failures: ResolvedFailure[],
   event: TEvent,
   result: TResult,
+  dryRun = false,
 ): TResult {
   let current: unknown = result;
 
@@ -75,6 +83,11 @@ export function runPostHandlerInjections<TEvent = unknown, TResult = unknown>(
     if (failure.mode !== "corruption") continue;
     if (failure.flag.match && !matchesConditions(event, failure.flag.match)) continue;
     if (Math.random() >= failure.rate) continue;
+
+    if (dryRun) {
+      log({ mode: failure.mode, action: "dryrun", rate: failure.rate });
+      continue;
+    }
 
     current = corruptResponse(failure.flag, current);
   }

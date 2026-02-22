@@ -1,4 +1,4 @@
-import type { MatchCondition } from "./types.js";
+import type { MatchCondition, MatchOperator } from "./types.js";
 
 /** Resolve a dot-separated path against a nested object */
 export function getNestedValue(obj: unknown, path: string): unknown {
@@ -10,11 +10,29 @@ export function getNestedValue(obj: unknown, path: string): unknown {
   return current;
 }
 
+/** Evaluate a single match operator against an actual value */
+function matchOperator(actual: unknown, operator: MatchOperator, value?: string): boolean {
+  switch (operator) {
+    case "exists":
+      return actual !== null && actual !== undefined;
+    case "startsWith":
+      if (actual === null || actual === undefined) return false;
+      return String(actual).startsWith(value ?? "");
+    case "regex":
+      if (actual === null || actual === undefined) return false;
+      return new RegExp(value ?? "").test(String(actual));
+    case "eq":
+    default:
+      if (actual === null || actual === undefined) return false;
+      return String(actual) === value;
+  }
+}
+
 /** Check whether all match conditions are satisfied by the event */
 export function matchesConditions(event: unknown, conditions: MatchCondition[]): boolean {
-  return conditions.every(({ path, value }) => {
-    const actual = getNestedValue(event, path);
-    if (actual === null || actual === undefined) return false;
-    return String(actual) === value;
+  return conditions.every((condition) => {
+    const actual = getNestedValue(event, condition.path);
+    const operator = condition.operator ?? "eq";
+    return matchOperator(actual, operator, condition.value);
   });
 }

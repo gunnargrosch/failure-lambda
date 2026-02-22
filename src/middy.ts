@@ -21,6 +21,10 @@ export function failureLambdaMiddleware<TEvent = unknown, TResult = unknown>(
 ): MiddyMiddleware<TEvent, TResult> {
   return {
     before: async (request) => {
+      if (process.env.FAILURE_LAMBDA_DISABLED === "true") {
+        return;
+      }
+
       const configProvider = options?.configProvider ?? getConfig;
       const flagsConfig = await configProvider();
       const failures = resolveFailures(flagsConfig);
@@ -28,10 +32,13 @@ export function failureLambdaMiddleware<TEvent = unknown, TResult = unknown>(
       // Store resolved failures for after phase
       request.internal = { ...request.internal, failureLambdaFailures: failures };
 
+      const dryRun = options?.dryRun === true;
+
       const preResult = await runPreHandlerInjections<TEvent, TResult>(
         failures,
         request.event,
         request.context,
+        dryRun,
       );
       if (preResult) {
         request.response = preResult.shortCircuit;
@@ -41,10 +48,13 @@ export function failureLambdaMiddleware<TEvent = unknown, TResult = unknown>(
     after: async (request) => {
       const failures = (request.internal?.failureLambdaFailures ?? []) as ResolvedFailure[];
 
+      const dryRun = options?.dryRun === true;
+
       request.response = runPostHandlerInjections(
         failures,
         request.event,
         request.response,
+        dryRun,
       );
     },
   };

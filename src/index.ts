@@ -15,6 +15,7 @@ export type {
   FailureLambdaOptions,
   ConfigValidationError,
   MatchCondition,
+  MatchOperator,
 } from "./types.js";
 export { getConfig, clearConfigCache, validateFlagValue, parseFlags, resolveFailures } from "./config.js";
 export { getNestedValue, matchesConditions } from "./matching.js";
@@ -47,19 +48,25 @@ function injectFailure<TEvent = unknown, TResult = unknown>(
     context: Context,
     callback: Callback<TResult>,
   ): Promise<TResult> {
+    if (process.env.FAILURE_LAMBDA_DISABLED === "true") {
+      return await handler(event, context, callback) as TResult;
+    }
+
     try {
       const configProvider = options?.configProvider ?? getConfig;
       const flagsConfig: FailureFlagsConfig = await configProvider();
       const failures = resolveFailures(flagsConfig);
 
-      const preResult = await runPreHandlerInjections<TEvent, TResult>(failures, event, context);
+      const dryRun = options?.dryRun === true;
+
+      const preResult = await runPreHandlerInjections<TEvent, TResult>(failures, event, context, dryRun);
       if (preResult) {
         return preResult.shortCircuit;
       }
 
       const result = await handler(event, context, callback) as TResult;
 
-      return runPostHandlerInjections(failures, event, result);
+      return runPostHandlerInjections(failures, event, result, dryRun);
     } catch (err) {
       logError({ action: "error", message: err instanceof Error ? err.message : String(err) });
       clearDenylist();

@@ -152,7 +152,7 @@ Each flag's `rate` is rolled independently.
 
 ### Event-Based Targeting
 
-Any flag can include a `match` array to restrict injection to events matching specific conditions. Each condition specifies a dot-separated `path` into the event and an expected `value`. All conditions must match for the flag to fire.
+Any flag can include a `match` array to restrict injection to events matching specific conditions. Each condition specifies a dot-separated `path` into the event. All conditions must match for the flag to fire.
 
 ```json
 {
@@ -169,6 +169,33 @@ Any flag can include a `match` array to restrict injection to events matching sp
 ```
 
 This example only corrupts GET requests to the `prod` stage. Flags without `match` apply to all invocations.
+
+#### Match Operators
+
+Each condition supports an optional `operator` field (defaults to `"eq"`):
+
+| Operator | Description | `value` required? |
+|----------|-------------|-------------------|
+| `eq` | Exact string equality (default) | Yes |
+| `exists` | Path exists and is not null/undefined | No |
+| `startsWith` | Value starts with the given prefix | Yes |
+| `regex` | Value matches the regular expression | Yes |
+
+```json
+{
+  "latency": {
+    "enabled": true,
+    "rate": 1,
+    "min_latency": 200,
+    "max_latency": 500,
+    "match": [
+      { "path": "requestContext.http.path", "operator": "startsWith", "value": "/api" },
+      { "path": "headers.x-debug", "operator": "exists" },
+      { "path": "requestContext.http.method", "operator": "regex", "value": "^(GET|HEAD)$" }
+    ]
+  }
+}
+```
 
 ## Configuration Sources
 
@@ -215,6 +242,7 @@ The AppConfig extension returns the feature flags in the same JSON shape the lib
 | `FAILURE_APPCONFIG_CONFIGURATION` | For AppConfig | AppConfig configuration profile name |
 | `AWS_APPCONFIG_EXTENSION_HTTP_PORT` | No | AppConfig extension port (default: `2772`) |
 | `FAILURE_CACHE_TTL` | No | Config cache TTL in seconds (default: `60`, set to `0` to disable) |
+| `FAILURE_LAMBDA_DISABLED` | No | Set to `"true"` to bypass all failure injection (kill switch) |
 
 ## Logging
 
@@ -260,6 +288,30 @@ export const handler = injectFailure(
   { configProvider: myConfigProvider }
 );
 ```
+
+### Dry Run Mode
+
+Log which failures would fire without actually injecting them. Useful for validating your configuration in production before enabling real fault injection:
+
+```ts
+import { injectFailure } from "failure-lambda";
+
+export const handler = injectFailure(
+  async (event, context) => {
+    return { statusCode: 200, body: "OK" };
+  },
+  { dryRun: true }
+);
+```
+
+In dry run mode, the library evaluates all enabled flags, rolls the rate dice, checks match conditions, and logs a `"dryrun"` action for each failure that would have fired — but never actually injects faults. The handler always runs normally.
+
+```json
+{"source":"failure-lambda","level":"info","mode":"latency","action":"dryrun","rate":0.5}
+{"source":"failure-lambda","level":"info","mode":"exception","action":"dryrun","rate":1}
+```
+
+The Middy middleware also supports `{ dryRun: true }`.
 
 ### Config Validation
 

@@ -24,12 +24,17 @@ export const FAILURE_MODE_ORDER: readonly FailureMode[] = [
   "corruption",
 ];
 
+/** Match operators for event-based targeting */
+export type MatchOperator = "eq" | "exists" | "startsWith" | "regex";
+
 /** Condition for event-based targeting */
 export interface MatchCondition {
   /** Dot-separated path into the event object (e.g. "requestContext.http.method") */
   path: string;
-  /** Expected string value at the path */
-  value: string;
+  /** Expected string value at the path. Required for all operators except "exists". */
+  value?: string;
+  /** Comparison operator. Defaults to "eq". */
+  operator?: MatchOperator;
 }
 
 /** A single feature flag's value */
@@ -85,6 +90,8 @@ export type LambdaHandler<TEvent = unknown, TResult = unknown> = (
 export interface FailureLambdaOptions {
   /** Override the config source (useful for testing or custom config backends) */
   configProvider?: () => Promise<FailureFlagsConfig>;
+  /** Log which failures would fire without actually injecting them */
+  dryRun?: boolean;
 }
 
 /** Internal: cached config entry */

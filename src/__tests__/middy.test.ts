@@ -24,6 +24,49 @@ function createConfigProvider(config: FailureFlagsConfig): () => Promise<Failure
 
 afterEach(() => {
   vi.restoreAllMocks();
+  delete process.env.FAILURE_LAMBDA_DISABLED;
+});
+
+describe("FAILURE_LAMBDA_DISABLED kill switch (middy)", () => {
+  it("should bypass all injection when FAILURE_LAMBDA_DISABLED=true", async () => {
+    process.env.FAILURE_LAMBDA_DISABLED = "true";
+
+    const middleware = failureLambdaMiddleware({
+      configProvider: createConfigProvider({
+        exception: { enabled: true, rate: 1, exception_msg: "Should not throw" },
+      }),
+    });
+
+    const request = {
+      event: {},
+      context: mockContext,
+      response: { statusCode: 200, body: "original" },
+      internal: {},
+    } as { event: unknown; context: Context; response?: unknown; internal?: Record<string, unknown> };
+
+    await middleware.before(request);
+    expect(request.response).toEqual({ statusCode: 200, body: "original" });
+  });
+});
+
+describe("dryRun option (middy)", () => {
+  it("should log failures without injecting them", async () => {
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    const middleware = failureLambdaMiddleware({
+      dryRun: true,
+      configProvider: createConfigProvider({
+        exception: { enabled: true, rate: 1, exception_msg: "Should not throw" },
+      }),
+    });
+
+    const request = { event: {}, context: mockContext, internal: {} };
+    await middleware.before(request);
+
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('"action":"dryrun"'));
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('"mode":"exception"'));
+  });
 });
 
 describe("failureLambdaMiddleware", () => {

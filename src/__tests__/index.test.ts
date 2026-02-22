@@ -26,6 +26,79 @@ function createConfigProvider(config: FailureFlagsConfig): () => Promise<Failure
 
 afterEach(() => {
   vi.restoreAllMocks();
+  delete process.env.FAILURE_LAMBDA_DISABLED;
+});
+
+describe("FAILURE_LAMBDA_DISABLED kill switch", () => {
+  it("should bypass all injection when FAILURE_LAMBDA_DISABLED=true", async () => {
+    process.env.FAILURE_LAMBDA_DISABLED = "true";
+    const handler = vi.fn().mockResolvedValue({ statusCode: 200 });
+    const wrapped = injectFailure(handler, {
+      configProvider: createConfigProvider({
+        exception: { enabled: true, rate: 1, exception_msg: "Should not throw" },
+      }),
+    });
+
+    const result = await wrapped({}, mockContext, mockCallback);
+    expect(result).toEqual({ statusCode: 200 });
+    expect(handler).toHaveBeenCalled();
+  });
+
+  it("should not bypass when FAILURE_LAMBDA_DISABLED is not 'true'", async () => {
+    process.env.FAILURE_LAMBDA_DISABLED = "false";
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    const handler = vi.fn();
+    const wrapped = injectFailure(handler, {
+      configProvider: createConfigProvider({
+        exception: { enabled: true, rate: 1, exception_msg: "Should throw" },
+      }),
+    });
+
+    await expect(wrapped({}, mockContext, mockCallback)).rejects.toThrow("Should throw");
+  });
+});
+
+describe("dryRun option", () => {
+  it("should log failures without injecting them", async () => {
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    const handler = vi.fn().mockResolvedValue({ statusCode: 200 });
+    const wrapped = injectFailure(handler, {
+      dryRun: true,
+      configProvider: createConfigProvider({
+        exception: { enabled: true, rate: 1, exception_msg: "Should not throw" },
+        latency: { enabled: true, rate: 0.5, min_latency: 100, max_latency: 400 },
+      }),
+    });
+
+    const result = await wrapped({}, mockContext, mockCallback);
+
+    expect(result).toEqual({ statusCode: 200 });
+    expect(handler).toHaveBeenCalled();
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('"action":"dryrun"'));
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('"mode":"latency"'));
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('"mode":"exception"'));
+  });
+
+  it("should log corruption dryrun without modifying response", async () => {
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    const handler = vi.fn().mockResolvedValue({ statusCode: 200, body: "original" });
+    const wrapped = injectFailure(handler, {
+      dryRun: true,
+      configProvider: createConfigProvider({
+        corruption: { enabled: true, rate: 1, body: "corrupted" },
+      }),
+    });
+
+    const result = await wrapped({}, mockContext, mockCallback);
+
+    expect(result).toEqual({ statusCode: 200, body: "original" });
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('"mode":"corruption"'));
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('"action":"dryrun"'));
+  });
 });
 
 describe("injectFailure wrapper", () => {
@@ -564,5 +637,43 @@ describe("matchesConditions", () => {
 
   it("should not match when path resolves to undefined", () => {
     expect(matchesConditions({ a: { b: 1 } }, [{ path: "a.c", value: "1" }])).toBe(false);
+  });
+
+  it("should support 'exists' operator", () => {
+    expect(matchesConditions({ a: "hello" }, [{ path: "a", operator: "exists" }])).toBe(true);
+    expect(matchesConditions({ a: 0 }, [{ path: "a", operator: "exists" }])).toBe(true);
+    expect(matchesConditions({ a: "" }, [{ path: "a", operator: "exists" }])).toBe(true);
+    expect(matchesConditions({}, [{ path: "a", operator: "exists" }])).toBe(false);
+    expect(matchesConditions({ a: null }, [{ path: "a", operator: "exists" }])).toBe(false);
+    expect(matchesConditions({ a: undefined }, [{ path: "a", operator: "exists" }])).toBe(false);
+  });
+
+  it("should support 'startsWith' operator", () => {
+    expect(matchesConditions({ path: "/api/users" }, [
+      { path: "path", operator: "startsWith", value: "/api" },
+    ])).toBe(true);
+    expect(matchesConditions({ path: "/web/users" }, [
+      { path: "path", operator: "startsWith", value: "/api" },
+    ])).toBe(false);
+    expect(matchesConditions({}, [
+      { path: "path", operator: "startsWith", value: "/api" },
+    ])).toBe(false);
+  });
+
+  it("should support 'regex' operator", () => {
+    expect(matchesConditions({ method: "GET" }, [
+      { path: "method", operator: "regex", value: "^(GET|HEAD)$" },
+    ])).toBe(true);
+    expect(matchesConditions({ method: "POST" }, [
+      { path: "method", operator: "regex", value: "^(GET|HEAD)$" },
+    ])).toBe(false);
+    expect(matchesConditions({}, [
+      { path: "method", operator: "regex", value: "^GET$" },
+    ])).toBe(false);
+  });
+
+  it("should default to 'eq' when operator is omitted", () => {
+    expect(matchesConditions({ a: "hello" }, [{ path: "a", value: "hello" }])).toBe(true);
+    expect(matchesConditions({ a: "hello" }, [{ path: "a", operator: "eq", value: "hello" }])).toBe(true);
   });
 });
