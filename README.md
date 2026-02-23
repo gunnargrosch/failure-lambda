@@ -5,7 +5,12 @@
 [![license](https://img.shields.io/npm/l/failure-lambda.svg)](LICENSE)
 [![node](https://img.shields.io/node/v/failure-lambda.svg)](package.json)
 
-Failure injection for AWS Lambda — chaos engineering made simple. Wrap your handler, use Middy middleware, or deploy as a Lambda Layer for zero-code fault injection across any runtime. Control failure injection with feature flags via SSM Parameter Store or AWS AppConfig.
+Failure injection for AWS Lambda — chaos engineering made simple. Two ways to get started:
+
+- **[Node.js](#quick-start):** Install the npm package and wrap your handler or use Middy middleware.
+- **[Any runtime](#lambda-layer):** Deploy the Lambda Layer for zero-code fault injection across Node.js, Python, Java, .NET, and Ruby — no code changes, no dependencies.
+
+Both approaches support the same [failure modes](#failure-modes) and are controlled via feature flags in SSM Parameter Store or AWS AppConfig.
 
 > **v1.0.0** is a major release with breaking changes. See [Migration from 0.x](#migration-from-0x).
 
