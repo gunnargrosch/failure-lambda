@@ -57,8 +57,15 @@ function injectFailure<TEvent = unknown, TResult = unknown>(
       const flagsConfig: FailureFlagsConfig = await configProvider();
       const failures = resolveFailures(flagsConfig);
 
-      const dryRun = options?.dryRun === true;
+      // Fast path: skip the async pre-handler call entirely when there are no
+      // active failures. The await of the async runPreHandlerInjections forces
+      // a microtask yield that lets background extensions (e.g. AppConfig)
+      // block the event loop for hundreds of milliseconds.
+      if (failures.length === 0) {
+        return await handler(event, context, callback) as TResult;
+      }
 
+      const dryRun = options?.dryRun === true;
       const preResult = await runPreHandlerInjections<TEvent, TResult>(failures, event, context, dryRun);
       if (preResult) {
         return preResult.shortCircuit;

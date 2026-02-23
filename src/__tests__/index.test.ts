@@ -2,6 +2,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import type { Context, Callback } from "aws-lambda";
 import injectFailure, { getNestedValue, matchesConditions } from "../index.js";
 import type { FailureFlagsConfig } from "../types.js";
+import * as orchestration from "../orchestration.js";
 
 const mockContext: Context = {
   callbackWaitsForEmptyEventLoop: true,
@@ -137,6 +138,22 @@ describe("injectFailure wrapper", () => {
 
       const result = await wrapped({}, mockContext, mockCallback);
       expect(result).toEqual(expectedResult);
+    });
+
+    it("should skip runPreHandlerInjections when no failures are active", async () => {
+      const spy = vi.spyOn(orchestration, "runPreHandlerInjections");
+      const handler = vi.fn().mockResolvedValue({ statusCode: 200 });
+      const wrapped = injectFailure(handler, {
+        configProvider: createConfigProvider({
+          latency: { enabled: false },
+          exception: { enabled: false },
+        }),
+      });
+
+      await wrapped({}, mockContext, mockCallback);
+
+      expect(spy).not.toHaveBeenCalled();
+      expect(handler).toHaveBeenCalled();
     });
   });
 
