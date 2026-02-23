@@ -95,9 +95,9 @@ The middleware runs pre-handler failures in its `before` phase and post-handler 
 | -------- | -------- | ------------ | ------------- |
 | **Wrapper** (`failureLambda(handler)`) | Node.js | Wrap handler | SSM or AppConfig |
 | **Middy middleware** | Node.js + Middy | Add middleware | SSM or AppConfig |
-| **[Lambda Layer](#lambda-layer)** | Any (Node.js, Python, Java, Go, ...) | None | SSM |
+| **[Lambda Layer](#lambda-layer)** | Any managed runtime (Node.js, Python, Java, .NET, Ruby) | None | SSM or AppConfig |
 
-The wrapper and middleware are npm packages for Node.js. The Lambda Layer is a standalone Rust proxy that works with any runtime — see [Lambda Layer](#lambda-layer).
+The wrapper and middleware are npm packages for Node.js. The Lambda Layer is a standalone Rust proxy that works with any managed runtime — see [Lambda Layer](#lambda-layer).
 
 ## Failure Modes
 
@@ -494,7 +494,7 @@ The Lambda Layer enables fault injection with **zero code changes** — no impor
 The layer includes a Rust proxy that sits between the Lambda runtime and the Lambda Runtime API:
 
 1. The wrapper script (`/opt/failure-lambda-wrapper`) starts the proxy and redirects `AWS_LAMBDA_RUNTIME_API` to it
-2. On each invocation, the proxy reads your failure configuration from SSM Parameter Store
+2. On each invocation, the proxy reads your failure configuration from SSM Parameter Store or AppConfig
 3. Based on the active flags, the proxy injects faults (latency, exception, statuscode, corruption, diskspace, timeout) before or after forwarding the invocation to your handler
 4. For `denylist` mode, an LD_PRELOAD shared library intercepts `getaddrinfo()` calls to block DNS resolution for matching hostnames
 
@@ -502,7 +502,7 @@ Your handler code is completely unchanged — the proxy is transparent.
 
 ### Supported Runtimes
 
-nodejs18.x, nodejs20.x, nodejs22.x, python3.12, python3.13, java21, provided.al2023
+nodejs18.x, nodejs20.x, nodejs22.x, python3.12, python3.13, java21, dotnet10, ruby3.4
 
 Both x86_64 and arm64 architectures are supported.
 
@@ -510,15 +510,18 @@ Both x86_64 and arm64 architectures are supported.
 
 1. Build the layer (see `layer/build.sh` for cross-compilation)
 2. Deploy the layer (see `layer/template.yaml` for a SAM example)
-3. Add the layer to your Lambda function
+3. Add the layer to your Lambda function (and the AppConfig extension layer if using AppConfig)
 4. Set the environment variables below
-5. Grant `ssm:GetParameter` permission for the parameter
+5. Grant `ssm:GetParameter` or `appconfig:StartConfigurationSession` + `appconfig:GetLatestConfiguration` permissions
 
 | Variable | Required | Description |
 | -------- | -------- | ----------- |
 | `AWS_LAMBDA_EXEC_WRAPPER` | Yes | Set to `/opt/failure-lambda-wrapper` |
-| `FAILURE_INJECTION_PARAM` | Yes | SSM Parameter Store parameter name |
-| `FAILURE_CACHE_TTL` | No | Config cache TTL in seconds (default: `60`) |
+| `FAILURE_INJECTION_PARAM` | For SSM | SSM Parameter Store parameter name |
+| `FAILURE_APPCONFIG_APPLICATION` | For AppConfig | AppConfig application name |
+| `FAILURE_APPCONFIG_ENVIRONMENT` | For AppConfig | AppConfig environment name |
+| `FAILURE_APPCONFIG_CONFIGURATION` | For AppConfig | AppConfig configuration profile name |
+| `FAILURE_CACHE_TTL` | No | Config cache TTL in seconds (default: `60` for SSM, `0` for AppConfig) |
 | `FAILURE_PROXY_PORT` | No | Proxy listen port (default: `9009`) |
 
 ### SAM Example
@@ -545,8 +548,8 @@ See `layer/template.yaml` for a full example with both x86_64 and arm64 layer va
 
 ### Limitations
 
-- **Config source:** The layer reads from SSM Parameter Store only (no AppConfig support)
-- **DNS denylist:** Uses LD_PRELOAD on `getaddrinfo()`, which does not work with runtimes that use statically linked DNS resolution (e.g., Go built with `CGO_ENABLED=0`). All other failure modes work regardless.
+- **Managed runtimes only:** The layer relies on `AWS_LAMBDA_EXEC_WRAPPER`, which is only supported on managed runtimes (Node.js, Python, Java, .NET, Ruby). It does not work on OS-only runtimes (`provided.al2023`, `provided.al2`) because Lambda silently ignores the wrapper on custom runtimes.
+- **DNS denylist:** Uses LD_PRELOAD on `getaddrinfo()`, which does not work with runtimes that use statically linked DNS resolution. All other failure modes work regardless.
 
 ## Migration from 0.x
 

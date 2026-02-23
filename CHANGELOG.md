@@ -22,7 +22,7 @@ Rewritten in TypeScript with a feature flag configuration model.
 - Exported `getConfig`, `validateFlagValue`, `resolveFailures`, `parseFlags`, and type definitions
 - CLI tool (`failure-lambda` command) for managing configuration interactively or via flags — supports `status`, `enable`, `disable`, and `disable --all` commands with SSM Parameter Store and AppConfig backends
 - Named CLI profiles saved to `~/.failure-lambda.json` for quick access to different configurations
-- Lambda Layer with Rust proxy for zero-code fault injection across any runtime (Node.js, Python, Java, Go) — deploy as a layer, set `AWS_LAMBDA_EXEC_WRAPPER`, no code changes required
+- Lambda Layer with Rust proxy for zero-code fault injection across any managed runtime (Node.js, Python, Java, .NET, Ruby) — deploy as a layer, set `AWS_LAMBDA_EXEC_WRAPPER`, no code changes required
 - DNS denylist interception via LD_PRELOAD shared library in the layer
 - Cross-architecture layer support (x86_64, arm64) with example SAM template
 

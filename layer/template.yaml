@@ -21,7 +21,8 @@ Resources:
         - python3.12
         - python3.13
         - java21
-        - provided.al2023
+        - dotnet10
+        - ruby3.4
       CompatibleArchitectures:
         - x86_64
 
@@ -38,7 +39,8 @@ Resources:
         - python3.12
         - python3.13
         - java21
-        - provided.al2023
+        - dotnet10
+        - ruby3.4
       CompatibleArchitectures:
         - arm64
 
