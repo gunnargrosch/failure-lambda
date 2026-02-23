@@ -34,6 +34,8 @@ npm install failure-lambda
 
 **Requirements:** Node.js >= 18 — Lambda runtimes `nodejs18.x`, `nodejs20.x`, or `nodejs22.x`.
 
+> **Bundling tip:** The only runtime dependency is `@aws-sdk/client-ssm`, which the Lambda runtime already provides. If you use esbuild (SAM, CDK), mark `@aws-sdk/*` as external to avoid bundling it: `External: ["@aws-sdk/*"]`. CLI-only dependencies (`@clack/prompts`, AppConfig SDK clients) are optional and excluded from the library entry points automatically.
+
 ## Quick Start
 
 ### ESM (recommended)
