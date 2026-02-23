@@ -5,7 +5,7 @@
 [![license](https://img.shields.io/npm/l/failure-lambda.svg)](LICENSE)
 [![node](https://img.shields.io/node/v/failure-lambda.svg)](package.json)
 
-Failure injection for AWS Lambda — chaos engineering made simple. Wrap your handler and control failure injection with feature flags via SSM Parameter Store or AWS AppConfig.
+Failure injection for AWS Lambda — chaos engineering made simple. Wrap your handler, use Middy middleware, or deploy as a Lambda Layer for zero-code fault injection across any runtime. Control failure injection with feature flags via SSM Parameter Store or AWS AppConfig.
 
 > **v1.0.0** is a major release with breaking changes. See [Migration from 0.x](#migration-from-0x).
 
@@ -21,6 +21,7 @@ Failure injection for AWS Lambda — chaos engineering made simple. Wrap your ha
 - [Logging](#logging)
 - [Advanced Usage](#advanced-usage)
 - [Examples](#examples)
+- [Lambda Layer](#lambda-layer)
 - [Migration from 0.x](#migration-from-0x)
 - [Contributing](#contributing)
 - [Acknowledgments](#acknowledgments)
@@ -87,6 +88,16 @@ export const handler = middy()
 ```
 
 The middleware runs pre-handler failures in its `before` phase and post-handler failures (corruption) in its `after` phase. It supports the same `configProvider` option as the wrapper.
+
+### Choosing an Integration
+
+| Approach | Runtimes | Code Changes | Config Source |
+| -------- | -------- | ------------ | ------------- |
+| **Wrapper** (`failureLambda(handler)`) | Node.js | Wrap handler | SSM or AppConfig |
+| **Middy middleware** | Node.js + Middy | Add middleware | SSM or AppConfig |
+| **[Lambda Layer](#lambda-layer)** | Any (Node.js, Python, Java, Go, ...) | None | SSM |
+
+The wrapper and middleware are npm packages for Node.js. The Lambda Layer is a standalone Rust proxy that works with any runtime — see [Lambda Layer](#lambda-layer).
 
 ## Failure Modes
 
@@ -336,7 +347,7 @@ failure-lambda
 All log output is structured JSON, making it easy to query in CloudWatch Logs Insights or any log aggregation tool. Every entry includes a `source` and `level` field, plus mode-specific details:
 
 ```json
-{"source":"failure-lambda","level":"info","action":"config","source":"ssm","cache_ttl_seconds":60,"enabled_flags":["latency","denylist"]}
+{"source":"failure-lambda","level":"info","action":"config","config_source":"ssm","cache_ttl_seconds":60,"enabled_flags":["latency","denylist"]}
 {"source":"failure-lambda","level":"info","mode":"latency","action":"inject","latency_ms":237,"min_latency":100,"max_latency":400}
 {"source":"failure-lambda","level":"info","mode":"denylist","action":"block","hostname":"s3.us-east-1.amazonaws.com"}
 {"source":"failure-lambda","level":"info","mode":"statuscode","action":"inject","status_code":503}
@@ -474,6 +485,69 @@ npm install
 sls deploy
 ```
 
+## Lambda Layer
+
+The Lambda Layer enables fault injection with **zero code changes** — no imports, no wrapper, no middleware. Add the layer to your function, set two environment variables, and your existing handler gets chaos engineering capabilities automatically.
+
+### How It Works
+
+The layer includes a Rust proxy that sits between the Lambda runtime and the Lambda Runtime API:
+
+1. The wrapper script (`/opt/failure-lambda-wrapper`) starts the proxy and redirects `AWS_LAMBDA_RUNTIME_API` to it
+2. On each invocation, the proxy reads your failure configuration from SSM Parameter Store
+3. Based on the active flags, the proxy injects faults (latency, exception, statuscode, corruption, diskspace, timeout) before or after forwarding the invocation to your handler
+4. For `denylist` mode, an LD_PRELOAD shared library intercepts `getaddrinfo()` calls to block DNS resolution for matching hostnames
+
+Your handler code is completely unchanged — the proxy is transparent.
+
+### Supported Runtimes
+
+nodejs18.x, nodejs20.x, nodejs22.x, python3.12, python3.13, java21, provided.al2023
+
+Both x86_64 and arm64 architectures are supported.
+
+### Setup
+
+1. Build the layer (see `layer/build.sh` for cross-compilation)
+2. Deploy the layer (see `layer/template.yaml` for a SAM example)
+3. Add the layer to your Lambda function
+4. Set the environment variables below
+5. Grant `ssm:GetParameter` permission for the parameter
+
+| Variable | Required | Description |
+| -------- | -------- | ----------- |
+| `AWS_LAMBDA_EXEC_WRAPPER` | Yes | Set to `/opt/failure-lambda-wrapper` |
+| `FAILURE_INJECTION_PARAM` | Yes | SSM Parameter Store parameter name |
+| `FAILURE_CACHE_TTL` | No | Config cache TTL in seconds (default: `60`) |
+| `FAILURE_PROXY_PORT` | No | Proxy listen port (default: `9009`) |
+
+### SAM Example
+
+```yaml
+MyFunction:
+  Type: AWS::Serverless::Function
+  Properties:
+    Handler: index.handler
+    Runtime: nodejs20.x
+    CodeUri: src/
+    Layers:
+      - !Ref FailureLambdaLayer
+    Environment:
+      Variables:
+        AWS_LAMBDA_EXEC_WRAPPER: /opt/failure-lambda-wrapper
+        FAILURE_INJECTION_PARAM: /my-app/failure-config
+    Policies:
+      - SSMParameterReadPolicy:
+          ParameterName: /my-app/failure-config
+```
+
+See `layer/template.yaml` for a full example with both x86_64 and arm64 layer variants and Node.js and Python functions.
+
+### Limitations
+
+- **Config source:** The layer reads from SSM Parameter Store only (no AppConfig support)
+- **DNS denylist:** Uses LD_PRELOAD on `getaddrinfo()`, which does not work with runtimes that use statically linked DNS resolution (e.g., Go built with `CGO_ENABLED=0`). All other failure modes work regardless.
+
 ## Migration from 0.x
 
 ### Breaking Changes
@@ -503,6 +577,7 @@ Old format:
 ```
 
 New format:
+
 ```json
 {
   "latency": {"enabled": true, "percentage": 100, "min_latency": 100, "max_latency": 400}

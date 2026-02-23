@@ -22,6 +22,9 @@ Rewritten in TypeScript with a feature flag configuration model.
 - Exported `getConfig`, `validateFlagValue`, `resolveFailures`, `parseFlags`, and type definitions
 - CLI tool (`failure-lambda` command) for managing configuration interactively or via flags — supports `status`, `enable`, `disable`, and `disable --all` commands with SSM Parameter Store and AppConfig backends
 - Named CLI profiles saved to `~/.failure-lambda.json` for quick access to different configurations
+- Lambda Layer with Rust proxy for zero-code fault injection across any runtime (Node.js, Python, Java, Go) — deploy as a layer, set `AWS_LAMBDA_EXEC_WRAPPER`, no code changes required
+- DNS denylist interception via LD_PRELOAD shared library in the layer
+- Cross-architecture layer support (x86_64, arm64) with example SAM template
 
 ### Changed
 
@@ -36,6 +39,10 @@ Rewritten in TypeScript with a feature flag configuration model.
 - Out-of-range `percentage` values clamped to `[0, 100]`
 - SAM example AppConfig layer ARN is now a parameter instead of a hardcoded region-specific ARN
 - SAM example esbuild configuration updated for correct ESM output
+- Skip `runPreHandlerInjections` when no failures are active, eliminating async overhead with AppConfig extension
+- Return well-formed API Gateway response from `statuscode` mode (avoids 502 errors)
+- Rename `source` to `config_source` in config log entry to avoid overwriting the top-level `source` field
+- Skip flags with any validation errors instead of partially applying them (fail-closed)
 
 ### Removed
 
