@@ -4,6 +4,7 @@
 [![CI](https://github.com/gunnargrosch/failure-lambda/actions/workflows/ci.yml/badge.svg)](https://github.com/gunnargrosch/failure-lambda/actions/workflows/ci.yml)
 [![license](https://img.shields.io/npm/l/failure-lambda.svg)](LICENSE)
 [![node](https://img.shields.io/node/v/failure-lambda.svg)](package.json)
+[![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue.svg)](https://www.typescriptlang.org/)
 
 Failure injection for AWS Lambda — chaos engineering made simple. Two ways to get started:
 
