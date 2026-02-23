@@ -386,10 +386,8 @@ export function parseFlags(raw: Record<string, unknown>): FailureFlagsConfig {
       for (const validationError of validationErrors) {
         warn({ action: "config", field: validationError.field, message: validationError.message, value: validationError.value });
       }
-      if (validationErrors.some((e) => e.field.endsWith(".enabled"))) {
-        warn({ action: "config", mode, message: "skipping flag due to invalid enabled field" });
-        continue;
-      }
+      warn({ action: "config", mode, message: "skipping flag due to validation errors" });
+      continue;
     }
 
     config[mode] = flagObj as unknown as FlagValue;

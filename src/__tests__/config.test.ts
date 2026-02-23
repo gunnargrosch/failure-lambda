@@ -450,10 +450,11 @@ describe("parseFlags", () => {
     expect(warnSpy).toHaveBeenCalled();
   });
 
-  it("should include flags with non-critical validation errors", () => {
-    vi.spyOn(console, "warn").mockImplementation(() => {});
+  it("should skip flags with any validation errors", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const config = parseFlags({ latency: { enabled: true, percentage: 100.5 } });
-    expect(config.latency?.enabled).toBe(true);
+    expect(config.latency).toBeUndefined();
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("skipping flag due to validation errors"));
   });
 
   it("should parse timeout flag", () => {
