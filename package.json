@@ -26,6 +26,9 @@
       "optional": true
     }
   },
+  "bin": {
+    "failure-lambda": "./dist/cli.js"
+  },
   "engines": {
     "node": ">=18.0.0"
   },
@@ -33,7 +36,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsup",
+    "build": "tsup && chmod +x dist/cli.js",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src/",
     "test": "vitest run",
@@ -64,7 +67,10 @@
   },
   "homepage": "https://github.com/gunnargrosch/failure-lambda#readme",
   "dependencies": {
-    "@aws-sdk/client-ssm": "^3.600.0"
+    "@aws-sdk/client-appconfig": "^3.995.0",
+    "@aws-sdk/client-appconfigdata": "^3.995.0",
+    "@aws-sdk/client-ssm": "^3.600.0",
+    "@clack/prompts": "^1.0.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
