@@ -106,8 +106,8 @@ describe("failureLambdaMiddleware", () => {
 
       const returnValue = await middleware.before(request);
 
-      expect(request.response).toEqual({ statusCode: 503 });
-      expect(returnValue).toEqual({ statusCode: 503 });
+      expect(request.response).toMatchObject({ statusCode: 503 });
+      expect(returnValue).toMatchObject({ statusCode: 503 });
     });
 
     it("should throw on exception mode", async () => {

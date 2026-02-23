@@ -245,7 +245,7 @@ describe("injectFailure wrapper", () => {
       });
 
       const result = await wrapped({}, mockContext, mockCallback);
-      expect(result).toEqual({ statusCode: 503 });
+      expect(result).toMatchObject({ statusCode: 503 });
       expect(handler).not.toHaveBeenCalled();
     });
   });
@@ -286,7 +286,7 @@ describe("injectFailure wrapper", () => {
       // Latency should have been injected first
       expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('"latency_ms":0'));
       // Then statuscode short-circuits
-      expect(result).toEqual({ statusCode: 503 });
+      expect(result).toMatchObject({ statusCode: 503 });
       expect(handler).not.toHaveBeenCalled();
     });
 
@@ -320,7 +320,7 @@ describe("injectFailure wrapper", () => {
 
       // statuscode comes before exception in ordering, so it short-circuits first
       const result = await wrapped({}, mockContext, mockCallback);
-      expect(result).toEqual({ statusCode: 418 });
+      expect(result).toMatchObject({ statusCode: 418 });
       expect(handler).not.toHaveBeenCalled();
     });
   });
@@ -360,7 +360,7 @@ describe("injectFailure wrapper", () => {
       const result = await wrapped({}, mockContext, mockCallback);
 
       expect(customProvider).toHaveBeenCalled();
-      expect(result).toEqual({ statusCode: 418 });
+      expect(result).toMatchObject({ statusCode: 418 });
     });
   });
 

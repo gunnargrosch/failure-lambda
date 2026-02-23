@@ -100,14 +100,22 @@ describe("injectStatusCode", () => {
     };
 
     const result = injectStatusCode(flag);
-    expect(result).toEqual({ statusCode: 503 });
+    expect(result).toEqual({
+      statusCode: 503,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: "Injected status code 503" }),
+    });
   });
 
   it("should default to 500 when status_code is undefined", () => {
     const flag: FlagValue = { enabled: true };
 
     const result = injectStatusCode(flag);
-    expect(result).toEqual({ statusCode: 500 });
+    expect(result).toEqual({
+      statusCode: 500,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: "Injected status code 500" }),
+    });
   });
 
   it("should log the injected status code", () => {
