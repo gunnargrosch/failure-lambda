@@ -10,3 +10,7 @@ samconfig.toml
 .claude/
 dist/
 coverage/
+
+# Layer (Rust proxy)
+layer/proxy/target/
+layer/dist/
