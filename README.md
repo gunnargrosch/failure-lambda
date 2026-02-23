@@ -457,14 +457,14 @@ const failures = resolveFailures(config);
 
 ## Examples
 
-The `example` directory contains sample applications with an AWS Lambda function, Amazon DynamoDB table, and SSM Parameter Store parameter. Deploy using AWS SAM, AWS CDK, or Serverless Framework.
+The `examples` directory contains sample applications with an AWS Lambda function, Amazon DynamoDB table, and SSM Parameter Store parameter. Deploy using AWS SAM, AWS CDK, or Serverless Framework.
 
 ### AWS SAM
 
 The SAM example supports both SSM and AppConfig via a `ConfigSource` parameter, and includes both a wrapper handler (`/`) and a Middy middleware handler (`/middy`):
 
 ```bash
-cd example/sam
+cd examples/sam
 npm install
 sam build
 
@@ -482,7 +482,7 @@ Find the AppConfig extension layer ARN for your region at the [AWS documentation
 ### AWS CDK
 
 ```bash
-cd example/cdk
+cd examples/cdk
 npm install
 cdk deploy
 ```
@@ -490,7 +490,7 @@ cdk deploy
 ### Serverless Framework
 
 ```bash
-cd example/sls
+cd examples/sls
 npm install
 sls deploy
 ```
