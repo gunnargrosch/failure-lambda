@@ -2,6 +2,12 @@ AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: Failure injection for AWS Lambda - failure-lambda example
 
+Globals:
+  Function:
+    Runtime: nodejs22.x
+    Timeout: 30
+    MemorySize: 128
+
 Parameters:
   ConfigSource:
     Type: String
@@ -10,6 +16,13 @@ Parameters:
       - SSM
       - AppConfig
     Description: Choose SSM Parameter Store or AppConfig Feature Flags as the config source
+  AppConfigExtensionLayerArn:
+    Type: String
+    Default: ""
+    Description: >-
+      ARN of the AWS AppConfig Lambda extension layer for your region and architecture.
+      Required when ConfigSource=AppConfig. Find your ARN at
+      https://docs.aws.amazon.com/appconfig/latest/userguide/appconfig-integration-lambda-extensions-versions.html
 
 Conditions:
   UseSSM: !Equals [!Ref ConfigSource, SSM]
@@ -30,7 +43,7 @@ Resources:
           "diskspace": {"enabled": false, "rate": 1, "disk_space": 100},
           "denylist": {"enabled": false, "rate": 1, "deny_list": ["s3.*.amazonaws.com", "dynamodb.*.amazonaws.com"]},
           "timeout": {"enabled": false, "rate": 1, "timeout_buffer_ms": 500},
-          "corruption": {"enabled": false, "rate": 1, "body": "{\"error\": \"corrupted\"}"}
+          "corruption": {"enabled": false, "rate": 0.3, "body": "{\"error\": \"corrupted\"}", "match": [{"path": "requestContext.http.method", "value": "GET"}]}
         }
 
   # --- AppConfig resources ---
@@ -125,7 +138,7 @@ Resources:
             "diskspace": {"enabled": false, "rate": 1, "disk_space": 100},
             "denylist": {"enabled": false, "rate": 1, "deny_list": ["s3.*.amazonaws.com", "dynamodb.*.amazonaws.com"]},
             "timeout": {"enabled": false, "rate": 1, "timeout_buffer_ms": 500},
-            "corruption": {"enabled": false, "rate": 1, "body": "{\"error\": \"corrupted\"}"}
+            "corruption": {"enabled": false, "rate": 0.3, "body": "{\"error\": \"corrupted\"}", "match": [{"path": "requestContext.http.method", "value": "GET"}]}
           }
         }
 
@@ -149,12 +162,11 @@ Resources:
       ConfigurationVersion: !Ref failureLambdaAppConfigVersion
       DeploymentStrategyId: !Ref failureLambdaAppConfigDeployStrategy
 
-  # --- Lambda function ---
+  # --- Lambda function (wrapper) ---
   failureLambdaFunction:
     Type: AWS::Serverless::Function
     Properties:
       Handler: handler.handler
-      Runtime: nodejs22.x
       Policies:
         - DynamoDBWritePolicy:
             TableName: !Ref failureLambdaTable
@@ -172,11 +184,10 @@ Resources:
                   - appconfig:GetLatestConfiguration
                 Resource: !Sub arn:aws:appconfig:${AWS::Region}:${AWS::AccountId}:application/${failureLambdaAppConfigApplication}/environment/${failureLambdaAppConfigEnvironment}/configuration/${failureLambdaAppConfigProfile}
           - !Ref AWS::NoValue
-      MemorySize: 128
       Layers:
         - !If
           - UseAppConfig
-          - !Sub arn:aws:lambda:${AWS::Region}:080313209042:layer:AWS-AppConfig-Extension:1
+          - !Ref AppConfigExtensionLayerArn
           - !Ref AWS::NoValue
       Environment:
         Variables:
@@ -209,8 +220,85 @@ Resources:
       BuildProperties:
         Minify: true
         Target: es2022
+        Format: esm
+        Sourcemap: true
         EntryPoints:
           - handler.ts
+        OutExtension:
+          - .js=.mjs
+        Banner:
+          - 'js=import { createRequire } from "module"; const require = createRequire(import.meta.url);'
+        External:
+          - "@aws-sdk/*"
+
+  # --- Lambda function (Middy middleware) ---
+  failureLambdaMiddyFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handler-middy.handler
+      Policies:
+        - DynamoDBWritePolicy:
+            TableName: !Ref failureLambdaTable
+        - !If
+          - UseSSM
+          - SSMParameterReadPolicy:
+              ParameterName: !Ref failureLambdaParameter
+          - !Ref AWS::NoValue
+        - !If
+          - UseAppConfig
+          - Statement:
+              - Effect: Allow
+                Action:
+                  - appconfig:StartConfigurationSession
+                  - appconfig:GetLatestConfiguration
+                Resource: !Sub arn:aws:appconfig:${AWS::Region}:${AWS::AccountId}:application/${failureLambdaAppConfigApplication}/environment/${failureLambdaAppConfigEnvironment}/configuration/${failureLambdaAppConfigProfile}
+          - !Ref AWS::NoValue
+      Layers:
+        - !If
+          - UseAppConfig
+          - !Ref AppConfigExtensionLayerArn
+          - !Ref AWS::NoValue
+      Environment:
+        Variables:
+          FAILURE_INJECTION_TABLE: !Ref failureLambdaTable
+          FAILURE_INJECTION_PARAM: !If
+            - UseSSM
+            - !Ref failureLambdaParameter
+            - !Ref AWS::NoValue
+          FAILURE_APPCONFIG_APPLICATION: !If
+            - UseAppConfig
+            - !Ref failureLambdaAppConfigApplication
+            - !Ref AWS::NoValue
+          FAILURE_APPCONFIG_ENVIRONMENT: !If
+            - UseAppConfig
+            - !Ref failureLambdaAppConfigEnvironment
+            - !Ref AWS::NoValue
+          FAILURE_APPCONFIG_CONFIGURATION: !If
+            - UseAppConfig
+            - !Ref failureLambdaAppConfigProfile
+            - !Ref AWS::NoValue
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            Path: /middy
+            Method: GET
+            ApiId: !Ref failureLambdaApi
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Format: esm
+        Sourcemap: true
+        EntryPoints:
+          - handler-middy.ts
+        OutExtension:
+          - .js=.mjs
+        Banner:
+          - 'js=import { createRequire } from "module"; const require = createRequire(import.meta.url);'
+        External:
+          - "@aws-sdk/*"
 
   failureLambdaApi:
     Type: AWS::Serverless::HttpApi

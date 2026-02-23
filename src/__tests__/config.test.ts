@@ -459,6 +459,7 @@ describe("getConfig with SSM", () => {
   beforeEach(() => {
     process.env.FAILURE_INJECTION_PARAM = "testParam";
     setSSMClient(new SSMClient({}));
+    vi.spyOn(console, "log").mockImplementation(() => {});
   });
 
   it("should fetch and parse valid SSM parameter", async () => {
@@ -510,6 +511,7 @@ describe("getConfig with AppConfig", () => {
   });
 
   it("should fetch from AppConfig with default port", async () => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
     const mockResponse = {
       ok: true,
       json: vi.fn().mockResolvedValue(VALID_FLAGS_CONFIG),
@@ -524,6 +526,7 @@ describe("getConfig with AppConfig", () => {
   });
 
   it("should use custom port from env var", async () => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
     process.env.AWS_APPCONFIG_EXTENSION_HTTP_PORT = "3000";
     const mockResponse = {
       ok: true,
@@ -557,6 +560,7 @@ describe("getConfig with AppConfig", () => {
   });
 
   it("should take priority over SSM when both env vars are set", async () => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
     process.env.FAILURE_INJECTION_PARAM = "testParam";
     const mockResponse = {
       ok: true,
@@ -571,6 +575,60 @@ describe("getConfig with AppConfig", () => {
     expect(config.latency?.rate).toBe(0.99);
     expect(globalThis.fetch).toHaveBeenCalled();
   });
+
+  it("should auto-disable library cache when using AppConfig", async () => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    let callCount = 0;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
+      callCount++;
+      return {
+        ok: true,
+        json: async () => VALID_FLAGS_CONFIG,
+      } as unknown as Response;
+    });
+
+    // No FAILURE_CACHE_TTL set — should default to 0 for AppConfig
+    await getConfig();
+    await getConfig();
+
+    expect(callCount).toBe(2);
+  });
+
+  it("should respect explicit FAILURE_CACHE_TTL even with AppConfig", async () => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    process.env.FAILURE_CACHE_TTL = "30";
+    let callCount = 0;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
+      callCount++;
+      return {
+        ok: true,
+        json: async () => VALID_FLAGS_CONFIG,
+      } as unknown as Response;
+    });
+
+    await getConfig();
+    await getConfig();
+
+    // Should cache — only 1 fetch
+    expect(callCount).toBe(1);
+  });
+
+  it("should warn when explicit cache TTL is set with AppConfig", async () => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    process.env.FAILURE_CACHE_TTL = "30";
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => VALID_FLAGS_CONFIG,
+    } as unknown as Response);
+
+    await getConfig();
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("AppConfig extension already caches"),
+    );
+  });
 });
 
 describe("getConfig with no config source", () => {
@@ -580,10 +638,82 @@ describe("getConfig with no config source", () => {
   });
 });
 
+describe("config source logging", () => {
+  it("should log config source on first SSM fetch", async () => {
+    process.env.FAILURE_INJECTION_PARAM = "testParam";
+    setSSMClient(new SSMClient({}));
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    ssmMock.on(GetParameterCommand).resolves({
+      Parameter: { Value: JSON.stringify(VALID_FLAGS_CONFIG) },
+    });
+
+    await getConfig();
+
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining('"source":"ssm"'),
+    );
+  });
+
+  it("should log config source on first AppConfig fetch", async () => {
+    process.env.FAILURE_APPCONFIG_CONFIGURATION = "myConfig";
+    process.env.FAILURE_APPCONFIG_APPLICATION = "myApp";
+    process.env.FAILURE_APPCONFIG_ENVIRONMENT = "myEnv";
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => VALID_FLAGS_CONFIG,
+    } as unknown as Response);
+
+    await getConfig();
+
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining('"source":"appconfig"'),
+    );
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining('"action":"config"'),
+    );
+  });
+
+  it("should log enabled flags on first fetch", async () => {
+    process.env.FAILURE_INJECTION_PARAM = "testParam";
+    setSSMClient(new SSMClient({}));
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    ssmMock.on(GetParameterCommand).resolves({
+      Parameter: { Value: JSON.stringify(VALID_FLAGS_CONFIG) },
+    });
+
+    await getConfig();
+
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining('"enabled_flags"'),
+    );
+  });
+
+  it("should only log config source once per cold start", async () => {
+    process.env.FAILURE_INJECTION_PARAM = "testParam";
+    process.env.FAILURE_CACHE_TTL = "0";
+    setSSMClient(new SSMClient({}));
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    ssmMock.on(GetParameterCommand).resolves({
+      Parameter: { Value: JSON.stringify(VALID_FLAGS_CONFIG) },
+    });
+
+    await getConfig();
+    await getConfig();
+    await getConfig();
+
+    const sourceLogCalls = logSpy.mock.calls.filter(
+      (call) => typeof call[0] === "string" && call[0].includes('"source":"ssm"'),
+    );
+    expect(sourceLogCalls).toHaveLength(1);
+  });
+});
+
 describe("config caching", () => {
   beforeEach(() => {
     process.env.FAILURE_INJECTION_PARAM = "testParam";
     setSSMClient(new SSMClient({}));
+    vi.spyOn(console, "log").mockImplementation(() => {});
   });
 
   it("should return cached config on second call within TTL", async () => {

@@ -8,7 +8,7 @@ import type {
   ConfigValidationError,
 } from "./types.js";
 import { DEFAULT_FLAGS_CONFIG, FAILURE_MODE_ORDER } from "./types.js";
-import { warn, error } from "./log.js";
+import { log, warn, error } from "./log.js";
 
 const KNOWN_FLAGS: ReadonlySet<string> = new Set(FAILURE_MODE_ORDER);
 
@@ -20,6 +20,9 @@ let configCache: CachedConfig | null = null;
 /** Lazy-initialized SSM client. Created on first use to avoid cold start penalty when using AppConfig. */
 let ssmClient: SSMClient | null = null;
 
+/** Whether we've logged the config source yet (once per cold start) */
+let hasLoggedSource = false;
+
 function getSSMClient(): SSMClient {
   if (ssmClient === null) {
     ssmClient = new SSMClient({});
@@ -27,15 +30,31 @@ function getSSMClient(): SSMClient {
   return ssmClient;
 }
 
+function isAppConfigSource(): boolean {
+  return Boolean(process.env.FAILURE_APPCONFIG_CONFIGURATION);
+}
+
 function getCacheTtlMs(): number {
   const envValue = process.env.FAILURE_CACHE_TTL;
   if (envValue === undefined || envValue === "") {
+    // Auto-disable library cache for AppConfig — the extension already caches
+    // at its poll interval (AWS_APPCONFIG_EXTENSION_POLL_INTERVAL_SECONDS).
+    // Double-caching adds unnecessary staleness when changing config.
+    if (isAppConfigSource()) {
+      return 0;
+    }
     return DEFAULT_CACHE_TTL_SECONDS * 1000;
   }
   const parsed = Number(envValue);
   if (Number.isNaN(parsed) || parsed < 0) {
     warn({ action: "config", message: `invalid FAILURE_CACHE_TTL="${envValue}", using default ${DEFAULT_CACHE_TTL_SECONDS}s` });
     return DEFAULT_CACHE_TTL_SECONDS * 1000;
+  }
+  if (parsed > 0 && isAppConfigSource()) {
+    warn({
+      action: "config",
+      message: `FAILURE_CACHE_TTL=${parsed}s with AppConfig — the AppConfig extension already caches at its poll interval; library caching adds staleness`,
+    });
   }
   return parsed * 1000;
 }
@@ -358,13 +377,29 @@ export async function getConfig(): Promise<FailureFlagsConfig> {
 
   try {
     let config: FailureFlagsConfig;
+    let source: string;
 
     if (process.env.FAILURE_APPCONFIG_CONFIGURATION) {
       config = await fetchFromAppConfig();
+      source = "appconfig";
     } else if (process.env.FAILURE_INJECTION_PARAM) {
       config = await fetchFromSSM();
+      source = "ssm";
     } else {
       return { ...DEFAULT_FLAGS_CONFIG };
+    }
+
+    if (!hasLoggedSource) {
+      const cacheTtlMs = getCacheTtlMs();
+      log({
+        action: "config",
+        source,
+        cache_ttl_seconds: cacheTtlMs / 1000,
+        enabled_flags: Object.keys(config).filter(
+          (k) => (config as Record<string, { enabled?: boolean }>)[k]?.enabled,
+        ),
+      });
+      hasLoggedSource = true;
     }
 
     configCache = {
@@ -382,6 +417,7 @@ export async function getConfig(): Promise<FailureFlagsConfig> {
 /** Clear the config cache. Useful for testing. @internal */
 export function clearConfigCache(): void {
   configCache = null;
+  hasLoggedSource = false;
 }
 
 /** Replace the SSM client instance. For testing with mocks. @internal */

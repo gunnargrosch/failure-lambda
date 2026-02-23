@@ -5,6 +5,7 @@
   "type": "module",
   "dependencies": {
     "failure-lambda": "",
+    "@middy/core": "^5.5.0",
     "@aws-sdk/client-dynamodb": "^3.600.0",
     "@aws-sdk/lib-dynamodb": "^3.600.0"
   },

@@ -18,7 +18,7 @@ export class FailureLambdaExampleStack extends Stack {
         diskspace: { enabled: false, rate: 1, disk_space: 100 },
         denylist: { enabled: false, rate: 1, deny_list: ["s3.*.amazonaws.com", "dynamodb.*.amazonaws.com"] },
         timeout: { enabled: false, rate: 1, timeout_buffer_ms: 500 },
-        corruption: { enabled: false, rate: 1, body: '{"error": "corrupted"}' },
+        corruption: { enabled: false, rate: 0.3, body: '{"error": "corrupted"}', match: [{ path: "requestContext.http.method", value: "GET" }] },
       }),
     });
 

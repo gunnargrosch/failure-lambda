@@ -199,7 +199,10 @@ Each condition supports an optional `operator` field (defaults to `"eq"`):
 
 ## Configuration Sources
 
-Configuration is cached in memory to reduce latency and API calls. The cache persists within a single Lambda container, resets on cold starts, and defaults to a 60-second TTL (configurable via `FAILURE_CACHE_TTL`).
+Configuration is cached in memory to reduce latency and API calls. The cache persists within a single Lambda container and resets on cold starts.
+
+- **SSM Parameter Store:** Defaults to a 60-second cache TTL (configurable via `FAILURE_CACHE_TTL`).
+- **AppConfig:** Cache is **auto-disabled** (TTL defaults to 0) because the AppConfig Lambda extension already handles caching at its own poll interval (`AWS_APPCONFIG_EXTENSION_POLL_INTERVAL_SECONDS`, default 45s). Double-caching adds unnecessary staleness when updating configuration. You can override this by setting `FAILURE_CACHE_TTL` explicitly, but a warning will be logged.
 
 ### SSM Parameter Store
 
@@ -241,7 +244,7 @@ The AppConfig extension returns the feature flags in the same JSON shape the lib
 | `FAILURE_APPCONFIG_ENVIRONMENT` | For AppConfig | AppConfig environment name |
 | `FAILURE_APPCONFIG_CONFIGURATION` | For AppConfig | AppConfig configuration profile name |
 | `AWS_APPCONFIG_EXTENSION_HTTP_PORT` | No | AppConfig extension port (default: `2772`) |
-| `FAILURE_CACHE_TTL` | No | Config cache TTL in seconds (default: `60`, set to `0` to disable) |
+| `FAILURE_CACHE_TTL` | No | Config cache TTL in seconds (default: `60` for SSM, `0` for AppConfig) |
 | `FAILURE_LAMBDA_DISABLED` | No | Set to `"true"` to bypass all failure injection (kill switch) |
 
 ## Logging
@@ -249,6 +252,7 @@ The AppConfig extension returns the feature flags in the same JSON shape the lib
 All log output is structured JSON, making it easy to query in CloudWatch Logs Insights or any log aggregation tool. Every entry includes a `source` and `level` field, plus mode-specific details:
 
 ```json
+{"source":"failure-lambda","level":"info","action":"config","source":"ssm","cache_ttl_seconds":60,"enabled_flags":["latency","denylist"]}
 {"source":"failure-lambda","level":"info","mode":"latency","action":"inject","latency_ms":237,"min_latency":100,"max_latency":400}
 {"source":"failure-lambda","level":"info","mode":"denylist","action":"block","hostname":"s3.us-east-1.amazonaws.com"}
 {"source":"failure-lambda","level":"info","mode":"statuscode","action":"inject","status_code":503}
@@ -352,7 +356,7 @@ The `example` directory contains sample applications with an AWS Lambda function
 
 ### AWS SAM
 
-The SAM example supports both SSM and AppConfig via a `ConfigSource` parameter:
+The SAM example supports both SSM and AppConfig via a `ConfigSource` parameter, and includes both a wrapper handler (`/`) and a Middy middleware handler (`/middy`):
 
 ```bash
 cd example/sam
@@ -362,9 +366,13 @@ sam build
 # Deploy with SSM (default)
 sam deploy --guided
 
-# Deploy with AppConfig Feature Flags
-sam deploy --guided --parameter-overrides ConfigSource=AppConfig
+# Deploy with AppConfig Feature Flags (provide your region's layer ARN)
+sam deploy --guided --parameter-overrides \
+  ConfigSource=AppConfig \
+  AppConfigExtensionLayerArn=arn:aws:lambda:eu-west-1:434848589818:layer:AWS-AppConfig-Extension:128
 ```
+
+Find the AppConfig extension layer ARN for your region at the [AWS documentation](https://docs.aws.amazon.com/appconfig/latest/userguide/appconfig-integration-lambda-extensions-versions.html).
 
 ### AWS CDK
 
@@ -397,7 +405,7 @@ sls deploy
 - **TypeScript.** Full type definitions included out of the box.
 - **Multiple simultaneous failures.** Enable latency + denylist + diskspace all at once.
 - **AppConfig Feature Flags.** Native support for `AWS.AppConfig.FeatureFlags` profile type.
-- **Configuration caching.** SSM/AppConfig responses are cached (60s default TTL), reducing latency and API costs.
+- **Configuration caching.** SSM responses are cached (60s default TTL), reducing latency and API costs. AppConfig caching is handled by the extension layer.
 - **Config validation.** Invalid configuration is caught and logged with clear error messages.
 - **Named exports.** `injectFailure`, `getConfig`, `validateFlagValue`, `resolveFailures`, `parseFlags` available as named imports.
 - **Custom config provider.** Pass `{ configProvider }` option for testing or custom backends.

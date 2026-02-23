@@ -10,51 +10,36 @@ Rewritten in TypeScript with a feature flag configuration model.
 
 ### Added
 
-- Full TypeScript type definitions included out of the box
-- Feature flag configuration model — each failure mode is an independent flag
-- Multiple simultaneous failures supported
-- Native AppConfig Feature Flags (`AWS.AppConfig.FeatureFlags`) support
-- In-memory configuration caching with configurable TTL
-- Configuration validation with clear error messages, including regex compilation checks for denylist patterns
+- TypeScript rewrite with full type definitions
+- Feature flag configuration model — each failure mode is an independent flag; multiple can be active simultaneously
+- `timeout` and `corruption` failure modes
+- Event-based targeting via `match` conditions with `eq`, `exists`, `startsWith`, and `regex` operators
+- Native AppConfig Feature Flags support with auto-disabled library cache (the extension already caches)
+- Middy middleware via `failure-lambda/middy` subpath export
+- `FAILURE_LAMBDA_DISABLED` env var kill switch and `dryRun` option
 - `configProvider` option for custom config backends
+- Configuration validation with structured JSON logging
 - Exported `getConfig`, `validateFlagValue`, `resolveFailures`, `parseFlags`, and type definitions
-- `timeout` failure mode — sleeps until Lambda timeout minus configurable buffer
-- `corruption` failure mode — replaces or mangles handler response body (post-handler)
-- Event-based targeting via `match` conditions on any flag with `eq`, `exists`, `startsWith`, and `regex` operators
-- Middy middleware integration via `failure-lambda/middy` subpath export
-- `FAILURE_LAMBDA_DISABLED` environment variable — set to `"true"` to bypass all injection without changing config
-- `dryRun` option — logs which failures would fire without actually injecting them
-- Structured JSON logging — all log output is machine-parseable with `source`, `level`, `mode`, and `action` fields
-- GitHub Actions CI workflow with Node.js 18/20/22 matrix
-- SAM example supports both SSM and AppConfig via parameter
 
 ### Changed
 
-- Migrated from AWS SDK v2 to v3 (`@aws-sdk/client-ssm`)
-- Replaced `node-fetch` with native `fetch()` (Node.js 18+)
-- Replaced `mitm` with `dns.lookup` monkey-patching for denylist failure mode
-- Dual CJS/ESM package output
-- Wrapper and Middy middleware share a single orchestration module
-- Updated examples to Node.js 22 and SDK v3
-- Minimum Node.js version: 18
+- AWS SDK v3, native `fetch()`, `dns.lookup` monkey-patching (replaces `aws-sdk` v2, `node-fetch`, `mitm`)
+- Dual CJS/ESM package output; minimum Node.js 18
+- Examples updated to Node.js 22, SDK v3; SAM example includes wrapper and Middy variants
 
 ### Fixed
 
-- Invalid denylist regex patterns are caught and skipped with a warning instead of crashing the invocation
-- `matchesConditions` no longer matches `null`/`undefined` values against `"null"`/`"undefined"` strings
-- Corruption mode wraps in `{ body }` when result has no body field instead of returning raw string
-- Diskspace injection logs errors when `dd` exits with non-zero status and uses correct `* 1024` for MB calculation
-- Out-of-range `rate` values are clamped to `[0, 1]` instead of silently misbehaving
-- ESLint configuration includes test files and all lint errors resolved
-- Coverage thresholds now include the main wrapper (`src/index.ts`)
-- CDK example updated to modern dependencies; timeout and corruption modes added to CDK and Serverless examples
+- Invalid denylist regex patterns are caught and skipped instead of crashing
+- Diskspace `dd` errors logged; correct `* 1024` byte calculation for MB
+- Out-of-range `rate` values clamped to `[0, 1]`
+- SAM example AppConfig layer ARN is now a parameter instead of a hardcoded region-specific ARN
+- SAM example esbuild configuration updated for correct ESM output
 
 ### Removed
 
-- `node-fetch` dependency
-- `mitm` dependency
-- Support for Node.js < 18 (`nodejs14.x`, `nodejs16.x`)
-- Flat `{isEnabled, failureMode, rate, ...}` configuration format (replaced by feature flag model)
+- `node-fetch` and `mitm` dependencies
+- Support for Node.js < 18
+- Flat `{isEnabled, failureMode, rate, ...}` configuration format
 
 ## [0.4.4] - 2022-02-14
 
