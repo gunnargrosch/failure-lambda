@@ -64,7 +64,7 @@ exports.handler = failureLambda(async (event, context) => {
 ### Named imports
 
 ```ts
-import { injectFailure, getConfig, validateFlagValue, resolveFailures } from "failure-lambda";
+import { injectFailure, getConfig, validateFlagValue, resolveFailures, parseFlags, getNestedValue, matchesConditions } from "failure-lambda";
 import type { FlagValue, FailureFlagsConfig, ResolvedFailure, FailureMode, MatchCondition, MatchOperator } from "failure-lambda";
 
 export const handler = injectFailure(async (event, context) => {
@@ -270,6 +270,7 @@ failure-lambda
 
 ```
 failure-lambda status              Show current configuration
+failure-lambda status --json       Show current configuration as raw JSON
 failure-lambda enable [mode]       Enable a failure mode
 failure-lambda disable [mode]      Disable a failure mode
 failure-lambda disable --all       Disable all failure modes
@@ -286,11 +287,14 @@ When run without a command, the CLI enters an interactive loop where you can run
 | `--env <id>` | AppConfig environment ID |
 | `--profile <id>` | AppConfig configuration profile ID |
 | `--region <region>` | AWS region (falls back to `AWS_REGION` / `AWS_DEFAULT_REGION`) |
+| `--json` | Output raw JSON (with `status` command) |
 | `--all` | Disable all modes (with `disable` command) |
 | `--help` | Show help |
 | `--version` | Show version |
 
 The same `FAILURE_INJECTION_PARAM` and `FAILURE_APPCONFIG_*` environment variables used by the library are also recognized by the CLI. If neither flags nor environment variables are set, the CLI prompts interactively.
+
+> **AppConfig writes:** When using AppConfig as the config source, `enable` and `disable` commands create a new hosted configuration version and immediately deploy it using the `AppConfig.AllAtOnce` strategy. This bypasses any custom deployment strategy you may have configured — use the CLI for development and testing, not production rollouts.
 
 ### Saved Profiles
 
@@ -504,7 +508,7 @@ Your handler code is completely unchanged — the proxy is transparent.
 
 nodejs18.x, nodejs20.x, nodejs22.x, python3.12, python3.13, java21, dotnet10, ruby3.4
 
-Both x86_64 and arm64 architectures are supported.
+Both x86_64 and arm64 architectures are supported. Any managed runtime that supports `AWS_LAMBDA_EXEC_WRAPPER` should work — the list above reflects what has been tested.
 
 ### Setup
 
@@ -523,6 +527,8 @@ Both x86_64 and arm64 architectures are supported.
 | `FAILURE_APPCONFIG_CONFIGURATION` | For AppConfig | AppConfig configuration profile name |
 | `FAILURE_CACHE_TTL` | No | Config cache TTL in seconds (default: `60` for SSM, `0` for AppConfig) |
 | `FAILURE_PROXY_PORT` | No | Proxy listen port (default: `9009`) |
+
+> **Note:** The `FAILURE_LAMBDA_DISABLED` kill switch is not supported by the layer. It only works with the Node.js wrapper and Middy middleware.
 
 ### SAM Example
 
@@ -549,7 +555,8 @@ See `layer/template.yaml` for a full example with both x86_64 and arm64 layer va
 ### Limitations
 
 - **Managed runtimes only:** The layer relies on `AWS_LAMBDA_EXEC_WRAPPER`, which is only supported on managed runtimes (Node.js, Python, Java, .NET, Ruby). It does not work on OS-only runtimes (`provided.al2023`, `provided.al2`) because Lambda silently ignores the wrapper on custom runtimes.
-- **DNS denylist:** Uses LD_PRELOAD on `getaddrinfo()`, which does not work with runtimes that use statically linked DNS resolution. All other failure modes work regardless.
+- **DNS denylist:** Uses LD_PRELOAD on `getaddrinfo()` to intercept DNS resolution, which does not work with runtimes that use statically linked DNS. The Node.js npm package uses `dns.lookup` monkey-patching instead, which is more reliable for Node.js. All other failure modes work regardless of runtime.
+- **No kill switch:** `FAILURE_LAMBDA_DISABLED` is not implemented in the layer proxy. To disable injection, set all flags to `enabled: false` in the configuration.
 
 ## Migration from 0.x
 
