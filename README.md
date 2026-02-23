@@ -518,11 +518,21 @@ Both x86_64 and arm64 architectures are supported. Any managed runtime that supp
 
 ### Setup
 
-1. Build the layer (see `layer/build.sh` for cross-compilation)
-2. Deploy the layer (see `layer/template.yaml` for a SAM example)
-3. Add the layer to your Lambda function (and the AppConfig extension layer if using AppConfig)
+1. Download the layer zip for your architecture from the [latest GitHub release](https://github.com/gunnargrosch/failure-lambda/releases/latest) (`failure-lambda-layer-x86_64.zip` or `failure-lambda-layer-aarch64.zip`)
+2. Publish the layer to your AWS account:
+   ```bash
+   aws lambda publish-layer-version \
+     --layer-name failure-lambda \
+     --zip-file fileb://failure-lambda-layer-aarch64.zip \
+     --compatible-runtimes nodejs20.x python3.13 java21 dotnet10 ruby3.4 \
+     --compatible-architectures arm64 \
+     --region eu-west-1
+   ```
+3. Add the layer to your Lambda function (and the [AppConfig extension layer](https://docs.aws.amazon.com/appconfig/latest/userguide/appconfig-integration-lambda-extensions-versions.html) if using AppConfig)
 4. Set the environment variables below
 5. Grant `ssm:GetParameter` or `appconfig:StartConfigurationSession` + `appconfig:GetLatestConfiguration` permissions
+
+To build the layer from source instead, see `layer/build.sh`.
 
 | Variable | Required | Description |
 | -------- | -------- | ----------- |
@@ -539,24 +549,30 @@ Both x86_64 and arm64 architectures are supported. Any managed runtime that supp
 ### SAM Example
 
 ```yaml
-MyFunction:
-  Type: AWS::Serverless::Function
-  Properties:
-    Handler: index.handler
-    Runtime: nodejs20.x
-    CodeUri: src/
-    Layers:
-      - !Ref FailureLambdaLayer
-    Environment:
-      Variables:
-        AWS_LAMBDA_EXEC_WRAPPER: /opt/failure-lambda-wrapper
-        FAILURE_INJECTION_PARAM: /my-app/failure-config
-    Policies:
-      - SSMParameterReadPolicy:
-          ParameterName: /my-app/failure-config
+Parameters:
+  FailureLambdaLayerArn:
+    Type: String
+    Description: ARN of the failure-lambda layer (from aws lambda publish-layer-version)
+
+Resources:
+  MyFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: index.handler
+      Runtime: nodejs20.x
+      CodeUri: src/
+      Layers:
+        - !Ref FailureLambdaLayerArn
+      Environment:
+        Variables:
+          AWS_LAMBDA_EXEC_WRAPPER: /opt/failure-lambda-wrapper
+          FAILURE_INJECTION_PARAM: /my-app/failure-config
+      Policies:
+        - SSMParameterReadPolicy:
+            ParameterName: /my-app/failure-config
 ```
 
-See `layer/template.yaml` for a full example with both x86_64 and arm64 layer variants and Node.js and Python functions.
+See `layer/template.yaml` for a full example that builds the layer from source with both x86_64 and arm64 variants.
 
 ### Limitations
 
