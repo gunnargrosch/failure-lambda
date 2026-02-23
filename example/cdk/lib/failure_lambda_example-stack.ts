@@ -12,13 +12,13 @@ export class FailureLambdaExampleStack extends Stack {
 
     const failureLambdaParameter = new ssm.StringParameter(this, "failureLambdaParameter", {
       stringValue: JSON.stringify({
-        latency: { enabled: false, rate: 1, min_latency: 100, max_latency: 400 },
-        exception: { enabled: false, rate: 1, exception_msg: "Exception message!" },
-        statuscode: { enabled: false, rate: 1, status_code: 404 },
-        diskspace: { enabled: false, rate: 1, disk_space: 100 },
-        denylist: { enabled: false, rate: 1, deny_list: ["s3.*.amazonaws.com", "dynamodb.*.amazonaws.com"] },
-        timeout: { enabled: false, rate: 1, timeout_buffer_ms: 500 },
-        corruption: { enabled: false, rate: 0.3, body: '{"error": "corrupted"}', match: [{ path: "requestContext.http.method", value: "GET" }] },
+        latency: { enabled: false, percentage: 100, min_latency: 100, max_latency: 400 },
+        exception: { enabled: false, percentage: 100, exception_msg: "Exception message!" },
+        statuscode: { enabled: false, percentage: 100, status_code: 404 },
+        diskspace: { enabled: false, percentage: 100, disk_space: 100 },
+        denylist: { enabled: false, percentage: 100, deny_list: ["s3.*.amazonaws.com", "dynamodb.*.amazonaws.com"] },
+        timeout: { enabled: false, percentage: 100, timeout_buffer_ms: 500 },
+        corruption: { enabled: false, percentage: 30, body: '{"error": "corrupted"}', match: [{ path: "requestContext.http.method", value: "GET" }] },
       }),
     });
 

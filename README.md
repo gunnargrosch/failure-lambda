@@ -16,6 +16,7 @@ Failure injection for AWS Lambda — chaos engineering made simple. Wrap your ha
 - [Failure Modes](#failure-modes)
 - [Configuration](#configuration)
 - [Configuration Sources](#configuration-sources)
+- [CLI](#cli)
 - [Environment Variables](#environment-variables)
 - [Logging](#logging)
 - [Advanced Usage](#advanced-usage)
@@ -97,7 +98,7 @@ The middleware runs pre-handler failures in its `before` phase and post-handler 
 | `denylist` | Blocks outgoing network connections to hostnames matching regex patterns |
 | `corruption` | Replaces or mangles the handler's response body *(post-handler)* |
 
-Multiple modes can be active simultaneously. Each mode is an independent feature flag with its own `rate` (probability of injection).
+Multiple modes can be active simultaneously. Each mode is an independent feature flag with its own `percentage` (probability of injection).
 
 ## Configuration
 
@@ -105,31 +106,31 @@ Each failure mode is an independent feature flag. This format is used by both SS
 
 ```json
 {
-  "latency": { "enabled": true, "rate": 1, "min_latency": 100, "max_latency": 400 },
-  "exception": { "enabled": false, "rate": 1, "exception_msg": "Exception message!" },
-  "statuscode": { "enabled": false, "rate": 1, "status_code": 404 },
-  "diskspace": { "enabled": false, "rate": 1, "disk_space": 100 },
-  "denylist": { "enabled": true, "rate": 0.5, "deny_list": ["s3.*.amazonaws.com", "dynamodb.*.amazonaws.com"] },
-  "timeout": { "enabled": false, "rate": 1, "timeout_buffer_ms": 500 },
-  "corruption": { "enabled": false, "rate": 0.3, "body": "{\"error\": \"corrupted\"}" }
+  "latency": { "enabled": true, "percentage": 100, "min_latency": 100, "max_latency": 400 },
+  "exception": { "enabled": false, "percentage": 100, "exception_msg": "Exception message!" },
+  "statuscode": { "enabled": false, "percentage": 100, "status_code": 404 },
+  "diskspace": { "enabled": false, "percentage": 100, "disk_space": 100 },
+  "denylist": { "enabled": true, "percentage": 50, "deny_list": ["s3.*.amazonaws.com", "dynamodb.*.amazonaws.com"] },
+  "timeout": { "enabled": false, "percentage": 100, "timeout_buffer_ms": 500 },
+  "corruption": { "enabled": false, "percentage": 30, "body": "{\"error\": \"corrupted\"}" }
 }
 ```
 
-When a flag is disabled, only `{"enabled": false}` is needed — attributes are optional. When enabled, `rate` defaults to `1` if omitted.
+When a flag is disabled, only `{"enabled": false}` is needed — attributes are optional. When enabled, `percentage` defaults to `100` if omitted.
 
 ### Flag Attributes
 
 | Flag | Attribute | Type | Description |
 |------|-----------|------|-------------|
 | *all* | `enabled` | `boolean` | Enable/disable this failure mode |
-| *all* | `rate` | `number` | Probability of injection (0-1). Default: `1` |
+| *all* | `percentage` | `integer` | Percentage of invocations to inject (0–100). Default: `100` |
 | *all* | `match` | `object[]` | Event-based targeting conditions (see below) |
 | `latency` | `min_latency` | `number` | Minimum latency in ms |
 | `latency` | `max_latency` | `number` | Maximum latency in ms |
 | `exception` | `exception_msg` | `string` | Error message thrown |
 | `statuscode` | `status_code` | `number` | HTTP status code returned (100-599) |
-| `diskspace` | `disk_space` | `number` | MB of disk to fill in `/tmp` |
-| `denylist` | `deny_list` | `string[]` | Regex patterns; matching hosts are blocked |
+| `diskspace` | `disk_space` | `number` | MB of disk to fill in `/tmp` (1–10240) |
+| `denylist` | `deny_list` | `string[]` | Regex patterns; matching hosts are blocked. Patterns with nested quantifiers are rejected to prevent ReDoS. |
 | `timeout` | `timeout_buffer_ms` | `number` | Buffer in ms before Lambda timeout. Default: `0` |
 | `corruption` | `body` | `string` | Replacement response body. If omitted, body is mangled. |
 
@@ -148,7 +149,7 @@ When multiple modes are enabled, pre-handler failures run first, then the handle
 **Post-handler** (after the handler returns):
 7. `corruption` — corrupts or replaces the handler's response
 
-Each flag's `rate` is rolled independently.
+Each flag's `percentage` is rolled independently.
 
 ### Event-Based Targeting
 
@@ -158,7 +159,7 @@ Any flag can include a `match` array to restrict injection to events matching sp
 {
   "corruption": {
     "enabled": true,
-    "rate": 0.3,
+    "percentage": 30,
     "body": "{\"error\": \"corrupted\"}",
     "match": [
       { "path": "requestContext.http.method", "value": "GET" },
@@ -185,7 +186,7 @@ Each condition supports an optional `operator` field (defaults to `"eq"`):
 {
   "latency": {
     "enabled": true,
-    "rate": 1,
+    "percentage": 100,
     "min_latency": 200,
     "max_latency": 500,
     "match": [
@@ -212,13 +213,13 @@ Configuration is cached in memory to reduce latency and API calls. The cache per
 
 ```bash
 aws ssm put-parameter --region eu-west-1 --name failureLambdaConfig --type String --overwrite --value '{
-  "latency": {"enabled": false, "rate": 1, "min_latency": 100, "max_latency": 400},
-  "exception": {"enabled": false, "rate": 1, "exception_msg": "Exception message!"},
-  "statuscode": {"enabled": false, "rate": 1, "status_code": 404},
-  "diskspace": {"enabled": false, "rate": 1, "disk_space": 100},
-  "denylist": {"enabled": false, "rate": 1, "deny_list": ["s3.*.amazonaws.com", "dynamodb.*.amazonaws.com"]},
-  "timeout": {"enabled": false, "rate": 1, "timeout_buffer_ms": 500},
-  "corruption": {"enabled": false, "rate": 1, "body": "{\"error\": \"corrupted\"}"}
+  "latency": {"enabled": false, "percentage": 100, "min_latency": 100, "max_latency": 400},
+  "exception": {"enabled": false, "percentage": 100, "exception_msg": "Exception message!"},
+  "statuscode": {"enabled": false, "percentage": 100, "status_code": 404},
+  "diskspace": {"enabled": false, "percentage": 100, "disk_space": 100},
+  "denylist": {"enabled": false, "percentage": 100, "deny_list": ["s3.*.amazonaws.com", "dynamodb.*.amazonaws.com"]},
+  "timeout": {"enabled": false, "percentage": 100, "timeout_buffer_ms": 500},
+  "corruption": {"enabled": false, "percentage": 100, "body": "{\"error\": \"corrupted\"}"}
 }'
 ```
 
@@ -234,6 +235,85 @@ AppConfig's native `AWS.AppConfig.FeatureFlags` profile type is a natural fit �
 6. Add permissions for your Lambda function to access the AppConfig resources (`appconfig:StartConfigurationSession` and `appconfig:GetLatestConfiguration`).
 
 The AppConfig extension returns the feature flags in the same JSON shape the library expects — no transformation needed.
+
+## CLI
+
+The `failure-lambda` CLI lets you manage failure injection configuration from your terminal without manually constructing JSON or running multi-step AWS commands.
+
+```bash
+npx failure-lambda
+```
+
+Or install globally:
+
+```bash
+npm install -g failure-lambda
+failure-lambda
+```
+
+### Commands
+
+```
+failure-lambda status              Show current configuration
+failure-lambda enable [mode]       Enable a failure mode
+failure-lambda disable [mode]      Disable a failure mode
+failure-lambda disable --all       Disable all failure modes
+```
+
+When run without a command, the CLI enters an interactive loop where you can run commands repeatedly until you choose to exit.
+
+### Flags
+
+| Flag | Description |
+|------|-------------|
+| `--param <name>` | SSM Parameter Store parameter name |
+| `--app <id>` | AppConfig application ID |
+| `--env <id>` | AppConfig environment ID |
+| `--profile <id>` | AppConfig configuration profile ID |
+| `--region <region>` | AWS region (falls back to `AWS_REGION` / `AWS_DEFAULT_REGION`) |
+| `--all` | Disable all modes (with `disable` command) |
+| `--help` | Show help |
+| `--version` | Show version |
+
+The same `FAILURE_INJECTION_PARAM` and `FAILURE_APPCONFIG_*` environment variables used by the library are also recognized by the CLI. If neither flags nor environment variables are set, the CLI prompts interactively.
+
+### Saved Profiles
+
+The CLI can save named profiles to `~/.failure-lambda.json` so you don't need to re-enter connection details. On first run you'll be prompted to save your configuration. On subsequent runs, you can select a saved profile or create a new one.
+
+Profiles store the AWS region and configuration source (SSM parameter name or AppConfig IDs). You can switch between profiles during an interactive session via the "Switch configuration" menu option.
+
+### Usage Examples
+
+Check the current status of a configuration:
+
+```bash
+failure-lambda status --param /my-app/failure-config --region eu-north-1
+```
+
+Enable latency injection interactively (prompts for percentage, min/max latency):
+
+```bash
+failure-lambda enable latency --param /my-app/failure-config
+```
+
+Disable all failure modes:
+
+```bash
+failure-lambda disable --all --param /my-app/failure-config
+```
+
+Use AppConfig as the configuration source:
+
+```bash
+failure-lambda status --app myApp --env myEnv --profile myProfile --region eu-north-1
+```
+
+Run in fully interactive mode (no flags needed if you have saved profiles):
+
+```bash
+failure-lambda
+```
 
 ## Environment Variables
 
@@ -280,7 +360,7 @@ import type { FailureFlagsConfig } from "failure-lambda";
 const myConfigProvider = async (): Promise<FailureFlagsConfig> => {
   // fetch config from your custom source
   return {
-    latency: { enabled: true, rate: 0.5, min_latency: 200, max_latency: 500 },
+    latency: { enabled: true, percentage: 50, min_latency: 200, max_latency: 500 },
     exception: { enabled: false },
   };
 };
@@ -310,11 +390,11 @@ export const handler = injectFailure(
 );
 ```
 
-In dry run mode, the library evaluates all enabled flags, rolls the rate dice, checks match conditions, and logs a `"dryrun"` action for each failure that would have fired — but never actually injects faults. The handler always runs normally.
+In dry run mode, the library evaluates all enabled flags, rolls the percentage dice, checks match conditions, and logs a `"dryrun"` action for each failure that would have fired — but never actually injects faults. The handler always runs normally.
 
 ```json
-{"source":"failure-lambda","level":"info","mode":"latency","action":"dryrun","rate":0.5}
-{"source":"failure-lambda","level":"info","mode":"exception","action":"dryrun","rate":1}
+{"source":"failure-lambda","level":"info","mode":"latency","action":"dryrun","percentage":50}
+{"source":"failure-lambda","level":"info","mode":"exception","action":"dryrun","percentage":100}
 ```
 
 The Middy middleware also supports `{ dryRun: true }`.
@@ -326,9 +406,9 @@ import { validateFlagValue } from "failure-lambda";
 
 const errors = validateFlagValue("latency", {
   enabled: true,
-  rate: 1.5, // invalid: must be 0-1
+  percentage: 150, // invalid: must be 0-100
 });
-// errors: [{ field: "latency.rate", message: "must be a number between 0 and 1", value: 1.5 }]
+// errors: [{ field: "latency.percentage", message: "must be an integer between 0 and 100", value: 150 }]
 ```
 
 ### Resolving Active Failures
@@ -338,15 +418,15 @@ import { resolveFailures } from "failure-lambda";
 import type { FailureFlagsConfig } from "failure-lambda";
 
 const config: FailureFlagsConfig = {
-  latency: { enabled: true, rate: 0.5, min_latency: 100, max_latency: 400 },
+  latency: { enabled: true, percentage: 50, min_latency: 100, max_latency: 400 },
   exception: { enabled: false },
   denylist: { enabled: true, deny_list: ["s3.*.amazonaws.com"] },
 };
 
 const failures = resolveFailures(config);
 // [
-//   { mode: "latency", rate: 0.5, flag: { enabled: true, ... } },
-//   { mode: "denylist", rate: 1, flag: { enabled: true, ... } },
+//   { mode: "latency", percentage: 50, flag: { enabled: true, ... } },
+//   { mode: "denylist", percentage: 100, flag: { enabled: true, ... } },
 // ]
 ```
 
@@ -421,7 +501,7 @@ Old format:
 New format:
 ```json
 {
-  "latency": {"enabled": true, "rate": 1, "min_latency": 100, "max_latency": 400}
+  "latency": {"enabled": true, "percentage": 100, "min_latency": 100, "max_latency": 400}
 }
 ```
 

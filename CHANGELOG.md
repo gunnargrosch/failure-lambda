@@ -18,8 +18,10 @@ Rewritten in TypeScript with a feature flag configuration model.
 - Middy middleware via `failure-lambda/middy` subpath export
 - `FAILURE_LAMBDA_DISABLED` env var kill switch and `dryRun` option
 - `configProvider` option for custom config backends
-- Configuration validation with structured JSON logging
+- Configuration validation with structured JSON logging, including ReDoS detection for regex patterns and a `disk_space` cap at Lambda's 10 GB `/tmp` limit
 - Exported `getConfig`, `validateFlagValue`, `resolveFailures`, `parseFlags`, and type definitions
+- CLI tool (`failure-lambda` command) for managing configuration interactively or via flags — supports `status`, `enable`, `disable`, and `disable --all` commands with SSM Parameter Store and AppConfig backends
+- Named CLI profiles saved to `~/.failure-lambda.json` for quick access to different configurations
 
 ### Changed
 
@@ -31,7 +33,7 @@ Rewritten in TypeScript with a feature flag configuration model.
 
 - Invalid denylist regex patterns are caught and skipped instead of crashing
 - Diskspace `dd` errors logged; correct `* 1024` byte calculation for MB
-- Out-of-range `rate` values clamped to `[0, 1]`
+- Out-of-range `percentage` values clamped to `[0, 100]`
 - SAM example AppConfig layer ARN is now a parameter instead of a hardcoded region-specific ARN
 - SAM example esbuild configuration updated for correct ESM output
 
@@ -39,7 +41,7 @@ Rewritten in TypeScript with a feature flag configuration model.
 
 - `node-fetch` and `mitm` dependencies
 - Support for Node.js < 18
-- Flat `{isEnabled, failureMode, rate, ...}` configuration format
+- Flat `{isEnabled, failureMode, ...}` configuration format (0.x)
 
 ## [0.4.4] - 2022-02-14
 
