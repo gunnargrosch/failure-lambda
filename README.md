@@ -198,6 +198,8 @@ Each condition supports an optional `operator` field (defaults to `"eq"`):
 }
 ```
 
+> **Header casing:** API Gateway lowercases all header keys in the Lambda event (e.g. `X-Chaos-Enabled` becomes `x-chaos-enabled`). Always use lowercase header names in match paths: `headers.x-debug`, not `headers.X-Debug`.
+
 ## Configuration Sources
 
 Configuration is cached in memory to reduce latency and API calls. The cache persists within a single Lambda container and resets on cold starts.
