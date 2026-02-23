@@ -300,8 +300,12 @@ describe("corruptResponse", () => {
 
     expect(result.statusCode).toBe(200);
     expect(typeof result.body).toBe("string");
-    expect((result.body as string).length).toBeLessThan(original.length + 10);
-    expect((result.body as string)).toContain("\uFFFD");
+    // Math.random mocked to 0.5 → truncatePoint = floor(49 * (0.3 + 0.5 * 0.5)) = floor(26.95) = 26
+    // Result = 26 chars + 3 replacement chars = 29
+    const mangled = result.body as string;
+    expect(mangled.length).toBeLessThan(original.length);
+    expect(mangled).toContain("\uFFFD");
+    expect(mangled.endsWith("\uFFFD\uFFFD\uFFFD")).toBe(true);
   });
 
   it("should return result as-is when mangling and result has no body, with warning", () => {
