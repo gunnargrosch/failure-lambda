@@ -33,7 +33,7 @@ describe("FAILURE_LAMBDA_DISABLED kill switch (middy)", () => {
 
     const middleware = failureLambdaMiddleware({
       configProvider: createConfigProvider({
-        exception: { enabled: true, rate: 1, exception_msg: "Should not throw" },
+        exception: { enabled: true, percentage: 100, exception_msg: "Should not throw" },
       }),
     });
 
@@ -57,7 +57,7 @@ describe("dryRun option (middy)", () => {
     const middleware = failureLambdaMiddleware({
       dryRun: true,
       configProvider: createConfigProvider({
-        exception: { enabled: true, rate: 1, exception_msg: "Should not throw" },
+        exception: { enabled: true, percentage: 100, exception_msg: "Should not throw" },
       }),
     });
 
@@ -77,7 +77,7 @@ describe("failureLambdaMiddleware", () => {
 
       const middleware = failureLambdaMiddleware({
         configProvider: createConfigProvider({
-          latency: { enabled: true, rate: 1, min_latency: 0, max_latency: 0 },
+          latency: { enabled: true, percentage: 100, min_latency: 0, max_latency: 0 },
         }),
       });
 
@@ -93,7 +93,7 @@ describe("failureLambdaMiddleware", () => {
 
       const middleware = failureLambdaMiddleware({
         configProvider: createConfigProvider({
-          statuscode: { enabled: true, rate: 1, status_code: 503 },
+          statuscode: { enabled: true, percentage: 100, status_code: 503 },
         }),
       });
 
@@ -116,7 +116,7 @@ describe("failureLambdaMiddleware", () => {
 
       const middleware = failureLambdaMiddleware({
         configProvider: createConfigProvider({
-          exception: { enabled: true, rate: 1, exception_msg: "Middy boom" },
+          exception: { enabled: true, percentage: 100, exception_msg: "Middy boom" },
         }),
       });
 
@@ -129,7 +129,7 @@ describe("failureLambdaMiddleware", () => {
 
       const middleware = failureLambdaMiddleware({
         configProvider: createConfigProvider({
-          corruption: { enabled: true, rate: 1, body: "bad" },
+          corruption: { enabled: true, percentage: 100, body: "bad" },
         }),
       });
 
@@ -171,7 +171,7 @@ describe("failureLambdaMiddleware", () => {
 
       const middleware = failureLambdaMiddleware({
         configProvider: createConfigProvider({
-          corruption: { enabled: true, rate: 1, body: '{"corrupted": true}' },
+          corruption: { enabled: true, percentage: 100, body: '{"corrupted": true}' },
         }),
       });
 
@@ -283,7 +283,7 @@ describe("failureLambdaMiddleware", () => {
         configProvider: createConfigProvider({
           exception: {
             enabled: true,
-            rate: 1,
+            percentage: 100,
             exception_msg: "Matched!",
             match: [{ path: "httpMethod", value: "GET" }],
           },
@@ -307,7 +307,7 @@ describe("failureLambdaMiddleware", () => {
         configProvider: createConfigProvider({
           corruption: {
             enabled: true,
-            rate: 1,
+            percentage: 100,
             body: "corrupted",
             match: [{ path: "type", value: "api" }],
           },

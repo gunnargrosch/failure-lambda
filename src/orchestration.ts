@@ -32,7 +32,7 @@ export async function runPreHandlerInjections<TEvent = unknown, TResult = unknow
 ): Promise<ShortCircuitResult<TResult> | undefined> {
   // Always clear previous invocation's side effects before re-evaluating.
   // Without this, a denylist/diskspace injection from a prior invocation persists
-  // even when the rate check fails on the current invocation.
+  // even when the percentage check fails on the current invocation.
   if (!dryRun) {
     clearDenylist();
     clearDiskSpace();
@@ -41,11 +41,11 @@ export async function runPreHandlerInjections<TEvent = unknown, TResult = unknow
   for (const failure of failures) {
     if (failure.mode === "corruption") continue;
     if (failure.flag.match && !matchesConditions(event, failure.flag.match)) continue;
-    const roll = Math.random();
-    if (roll >= failure.rate) continue;
+    const roll = Math.random() * 100;
+    if (roll >= failure.percentage) continue;
 
     if (dryRun) {
-      log({ mode: failure.mode, action: "dryrun", rate: failure.rate, roll });
+      log({ mode: failure.mode, action: "dryrun", percentage: failure.percentage, roll });
       continue;
     }
 
@@ -88,11 +88,11 @@ export function runPostHandlerInjections<TEvent = unknown, TResult = unknown>(
   for (const failure of failures) {
     if (failure.mode !== "corruption") continue;
     if (failure.flag.match && !matchesConditions(event, failure.flag.match)) continue;
-    const roll = Math.random();
-    if (roll >= failure.rate) continue;
+    const roll = Math.random() * 100;
+    if (roll >= failure.percentage) continue;
 
     if (dryRun) {
-      log({ mode: failure.mode, action: "dryrun", rate: failure.rate, roll });
+      log({ mode: failure.mode, action: "dryrun", percentage: failure.percentage, roll });
       continue;
     }
 

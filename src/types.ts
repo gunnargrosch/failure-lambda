@@ -40,8 +40,8 @@ export interface MatchCondition {
 /** A single feature flag's value */
 export interface FlagValue {
   enabled: boolean;
-  /** Probability of injection per invocation (0.0 to 1.0). Defaults to 1. */
-  rate?: number;
+  /** Percentage of invocations to inject (0 to 100, integer). Defaults to 100. */
+  percentage?: number;
   /** Minimum latency in ms (latency mode) */
   min_latency?: number;
   /** Maximum latency in ms (latency mode) */
@@ -68,7 +68,7 @@ export type FailureFlagsConfig = Partial<Record<FailureMode, FlagValue>>;
 /** A failure resolved and ready to inject */
 export interface ResolvedFailure {
   mode: FailureMode;
-  rate: number;
+  percentage: number;
   flag: FlagValue;
 }
 

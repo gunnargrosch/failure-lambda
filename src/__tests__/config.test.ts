@@ -8,16 +8,17 @@ import {
   parseFlags,
   resolveFailures,
   setSSMClient,
+  isUnsafeRegex,
 } from "../config.js";
 
 const ssmMock = mockClient(SSMClient);
 
 const VALID_FLAGS_CONFIG = {
-  latency: { enabled: true, rate: 0.5, min_latency: 100, max_latency: 400 },
+  latency: { enabled: true, percentage: 50, min_latency: 100, max_latency: 400 },
   exception: { enabled: false },
-  statuscode: { enabled: false, rate: 1, status_code: 404 },
-  diskspace: { enabled: false, rate: 1, disk_space: 100 },
-  denylist: { enabled: true, rate: 1, deny_list: ["s3.*.amazonaws.com"] },
+  statuscode: { enabled: false, percentage: 100, status_code: 404 },
+  diskspace: { enabled: false, percentage: 100, disk_space: 100 },
+  denylist: { enabled: true, percentage: 100, deny_list: ["s3.*.amazonaws.com"] },
 };
 
 beforeEach(() => {
@@ -39,7 +40,7 @@ describe("validateFlagValue", () => {
   it("should return no errors for a valid enabled latency flag", () => {
     const errors = validateFlagValue("latency", {
       enabled: true,
-      rate: 0.5,
+      percentage: 50,
       min_latency: 100,
       max_latency: 400,
     });
@@ -63,31 +64,37 @@ describe("validateFlagValue", () => {
     expect(errors[0].field).toBe("latency.enabled");
   });
 
-  it("should return error when rate is below 0", () => {
-    const errors = validateFlagValue("latency", { enabled: true, rate: -0.5 });
+  it("should return error when percentage is below 0", () => {
+    const errors = validateFlagValue("latency", { enabled: true, percentage: -1 });
     expect(errors).toHaveLength(1);
-    expect(errors[0].field).toBe("latency.rate");
+    expect(errors[0].field).toBe("latency.percentage");
   });
 
-  it("should return error when rate is above 1", () => {
-    const errors = validateFlagValue("exception", { enabled: true, rate: 1.5 });
+  it("should return error when percentage is above 100", () => {
+    const errors = validateFlagValue("exception", { enabled: true, percentage: 150 });
     expect(errors).toHaveLength(1);
-    expect(errors[0].field).toBe("exception.rate");
+    expect(errors[0].field).toBe("exception.percentage");
   });
 
-  it("should return error when rate is not a number", () => {
-    const errors = validateFlagValue("latency", { enabled: true, rate: "high" });
+  it("should return error when percentage is not a number", () => {
+    const errors = validateFlagValue("latency", { enabled: true, percentage: "high" });
     expect(errors).toHaveLength(1);
-    expect(errors[0].field).toBe("latency.rate");
+    expect(errors[0].field).toBe("latency.percentage");
   });
 
-  it("should accept rate of exactly 0", () => {
-    const errors = validateFlagValue("latency", { enabled: true, rate: 0 });
+  it("should return error when percentage is a decimal", () => {
+    const errors = validateFlagValue("latency", { enabled: true, percentage: 50.5 });
+    expect(errors).toHaveLength(1);
+    expect(errors[0].field).toBe("latency.percentage");
+  });
+
+  it("should accept percentage of exactly 0", () => {
+    const errors = validateFlagValue("latency", { enabled: true, percentage: 0 });
     expect(errors).toHaveLength(0);
   });
 
-  it("should accept rate of exactly 1", () => {
-    const errors = validateFlagValue("latency", { enabled: true, rate: 1 });
+  it("should accept percentage of exactly 100", () => {
+    const errors = validateFlagValue("latency", { enabled: true, percentage: 100 });
     expect(errors).toHaveLength(0);
   });
 
@@ -128,6 +135,18 @@ describe("validateFlagValue", () => {
     const errors = validateFlagValue("diskspace", { enabled: true, disk_space: 0 });
     expect(errors).toHaveLength(1);
     expect(errors[0].field).toBe("diskspace.disk_space");
+  });
+
+  it("should return error for disk_space exceeding 10240 MB", () => {
+    const errors = validateFlagValue("diskspace", { enabled: true, disk_space: 10241 });
+    expect(errors).toHaveLength(1);
+    expect(errors[0].field).toBe("diskspace.disk_space");
+    expect(errors[0].message).toContain("10240");
+  });
+
+  it("should accept disk_space at the 10240 MB cap", () => {
+    const errors = validateFlagValue("diskspace", { enabled: true, disk_space: 10240 });
+    expect(errors).toHaveLength(0);
   });
 
   it("should return error when deny_list is not an array", () => {
@@ -313,6 +332,81 @@ describe("validateFlagValue", () => {
     });
     expect(errors).toHaveLength(0);
   });
+
+  it("should return error for unsafe regex in deny_list (nested quantifiers)", () => {
+    const errors = validateFlagValue("denylist", {
+      enabled: true,
+      deny_list: ["(a+)+"],
+    });
+    expect(errors).toHaveLength(1);
+    expect(errors[0].field).toBe("denylist.deny_list[0]");
+    expect(errors[0].message).toContain("unsafe pattern");
+  });
+
+  it("should return error for unsafe regex in match value (nested quantifiers)", () => {
+    const errors = validateFlagValue("latency", {
+      enabled: true,
+      match: [{ path: "foo", operator: "regex", value: "(a+)+" }],
+    });
+    expect(errors).toHaveLength(1);
+    expect(errors[0].field).toBe("latency.match[0].value");
+    expect(errors[0].message).toContain("unsafe pattern");
+  });
+});
+
+describe("isUnsafeRegex", () => {
+  it("should detect (a+)+", () => {
+    expect(isUnsafeRegex("(a+)+")).toBe(true);
+  });
+
+  it("should detect (a+)*", () => {
+    expect(isUnsafeRegex("(a+)*")).toBe(true);
+  });
+
+  it("should detect (a*)+", () => {
+    expect(isUnsafeRegex("(a*)+")).toBe(true);
+  });
+
+  it("should detect (a*)*", () => {
+    expect(isUnsafeRegex("(a*)*")).toBe(true);
+  });
+
+  it("should detect (a+){2,}", () => {
+    expect(isUnsafeRegex("(a+){2,}")).toBe(true);
+  });
+
+  it("should detect nested groups with quantifiers ((a+)b)+", () => {
+    expect(isUnsafeRegex("((a+)b)+")).toBe(true);
+  });
+
+  it("should allow simple quantifiers without nesting", () => {
+    expect(isUnsafeRegex("a+")).toBe(false);
+    expect(isUnsafeRegex("(abc)+")).toBe(false);
+    expect(isUnsafeRegex("a*b+c?")).toBe(false);
+  });
+
+  it("should allow common hostname patterns", () => {
+    expect(isUnsafeRegex("s3\\..*\\.amazonaws\\.com")).toBe(false);
+    expect(isUnsafeRegex("^dynamodb\\.")).toBe(false);
+    expect(isUnsafeRegex("^(GET|POST|PUT|DELETE)$")).toBe(false);
+  });
+
+  it("should allow escaped characters inside groups", () => {
+    expect(isUnsafeRegex("(\\d+)")).toBe(false);
+    expect(isUnsafeRegex("(\\w+\\.)+")).toBe(true);
+  });
+
+  it("should ignore quantifiers inside character classes", () => {
+    expect(isUnsafeRegex("([a+])+")).toBe(false);
+  });
+
+  it("should reject overly long patterns", () => {
+    expect(isUnsafeRegex("a".repeat(513))).toBe(true);
+  });
+
+  it("should accept patterns at the length limit", () => {
+    expect(isUnsafeRegex("a".repeat(512))).toBe(false);
+  });
 });
 
 describe("parseFlags", () => {
@@ -335,6 +429,13 @@ describe("parseFlags", () => {
     expect(Object.keys(config)).toHaveLength(1);
   });
 
+  it("should warn when 0.x config format is detected", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const config = parseFlags({ isEnabled: true, failureMode: "latency", rate: 1, minLatency: 100, maxLatency: 400 });
+    expect(Object.keys(config)).toHaveLength(0);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("0.x configuration format"));
+  });
+
   it("should skip non-object flag values", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const config = parseFlags({ latency: "not an object" });
@@ -351,7 +452,7 @@ describe("parseFlags", () => {
 
   it("should include flags with non-critical validation errors", () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
-    const config = parseFlags({ latency: { enabled: true, rate: 1.5 } });
+    const config = parseFlags({ latency: { enabled: true, percentage: 100.5 } });
     expect(config.latency?.enabled).toBe(true);
   });
 
@@ -399,32 +500,32 @@ describe("resolveFailures", () => {
     expect(modes).toEqual(["latency", "diskspace", "denylist", "statuscode", "exception"]);
   });
 
-  it("should default rate to 1 when omitted", () => {
+  it("should default percentage to 100 when omitted", () => {
     const failures = resolveFailures({
       latency: { enabled: true, min_latency: 100, max_latency: 200 },
     });
-    expect(failures[0].rate).toBe(1);
+    expect(failures[0].percentage).toBe(100);
   });
 
-  it("should use provided rate", () => {
+  it("should use provided percentage", () => {
     const failures = resolveFailures({
-      latency: { enabled: true, rate: 0.3 },
+      latency: { enabled: true, percentage: 30 },
     });
-    expect(failures[0].rate).toBe(0.3);
+    expect(failures[0].percentage).toBe(30);
   });
 
-  it("should clamp rate above 1 to 1", () => {
+  it("should clamp percentage above 100 to 100", () => {
     const failures = resolveFailures({
-      latency: { enabled: true, rate: 1.5 },
+      latency: { enabled: true, percentage: 150 },
     });
-    expect(failures[0].rate).toBe(1);
+    expect(failures[0].percentage).toBe(100);
   });
 
-  it("should clamp rate below 0 to 0", () => {
+  it("should clamp percentage below 0 to 0", () => {
     const failures = resolveFailures({
-      latency: { enabled: true, rate: -0.5 },
+      latency: { enabled: true, percentage: -10 },
     });
-    expect(failures[0].rate).toBe(0);
+    expect(failures[0].percentage).toBe(0);
   });
 
   it("should include timeout and corruption in correct order", () => {
@@ -471,7 +572,7 @@ describe("getConfig with SSM", () => {
 
     const config = await getConfig();
     expect(config.latency?.enabled).toBe(true);
-    expect(config.latency?.rate).toBe(0.5);
+    expect(config.latency?.percentage).toBe(50);
     expect(config.denylist?.enabled).toBe(true);
   });
 
@@ -566,13 +667,13 @@ describe("getConfig with AppConfig", () => {
       ok: true,
       json: vi.fn().mockResolvedValue({
         ...VALID_FLAGS_CONFIG,
-        latency: { enabled: true, rate: 0.99, min_latency: 100, max_latency: 400 },
+        latency: { enabled: true, percentage: 99, min_latency: 100, max_latency: 400 },
       }),
     };
     vi.spyOn(globalThis, "fetch").mockResolvedValue(mockResponse as unknown as Response);
 
     const config = await getConfig();
-    expect(config.latency?.rate).toBe(0.99);
+    expect(config.latency?.percentage).toBe(99);
     expect(globalThis.fetch).toHaveBeenCalled();
   });
 

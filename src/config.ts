@@ -12,6 +12,74 @@ import { log, warn, error } from "./log.js";
 
 const KNOWN_FLAGS: ReadonlySet<string> = new Set(FAILURE_MODE_ORDER);
 
+const MAX_DISK_SPACE_MB = 10240;
+const MAX_REGEX_LENGTH = 512;
+
+/**
+ * Detect regex patterns vulnerable to catastrophic backtracking (ReDoS).
+ * Checks for nested quantifiers like (a+)+, (a*)+, (a+)*, etc.
+ * Also rejects overly long patterns as a general safety measure.
+ */
+export function isUnsafeRegex(pattern: string): boolean {
+  if (pattern.length > MAX_REGEX_LENGTH) return true;
+
+  let depth = 0;
+  const hasQuantifierInGroup: boolean[] = [false];
+
+  for (let i = 0; i < pattern.length; i++) {
+    const ch = pattern[i];
+
+    if (ch === "\\") {
+      i++;
+      continue;
+    }
+
+    if (ch === "[") {
+      i++;
+      while (i < pattern.length) {
+        if (pattern[i] === "\\") i++;
+        else if (pattern[i] === "]") break;
+        i++;
+      }
+      continue;
+    }
+
+    if (ch === "(") {
+      depth++;
+      hasQuantifierInGroup[depth] = false;
+      continue;
+    }
+
+    if (ch === ")") {
+      const groupHadQuantifier = hasQuantifierInGroup[depth] ?? false;
+      depth = Math.max(0, depth - 1);
+
+      if (groupHadQuantifier && i + 1 < pattern.length) {
+        const next = pattern[i + 1];
+        if (next === "+" || next === "*" || next === "{") {
+          return true;
+        }
+      }
+      if (depth > 0 && groupHadQuantifier) {
+        hasQuantifierInGroup[depth] = true;
+      }
+      continue;
+    }
+
+    if (depth > 0 && (ch === "+" || ch === "*")) {
+      hasQuantifierInGroup[depth] = true;
+    }
+    if (depth > 0 && ch === "{") {
+      const rest = pattern.slice(i);
+      if (/^\{\d+,/.test(rest)) {
+        hasQuantifierInGroup[depth] = true;
+      }
+    }
+  }
+
+  return false;
+}
+
 const DEFAULT_CACHE_TTL_SECONDS = 60;
 
 /** Module-level cache. Resets naturally on Lambda cold start. */
@@ -85,12 +153,12 @@ export function validateFlagValue(
     });
   }
 
-  if (raw.rate !== undefined) {
-    if (typeof raw.rate !== "number" || raw.rate < 0 || raw.rate > 1) {
+  if (raw.percentage !== undefined) {
+    if (typeof raw.percentage !== "number" || !Number.isInteger(raw.percentage) || raw.percentage < 0 || raw.percentage > 100) {
       errors.push({
-        field: `${mode}.rate`,
-        message: "must be a number between 0 and 1",
-        value: raw.rate,
+        field: `${mode}.percentage`,
+        message: "must be an integer between 0 and 100",
+        value: raw.percentage,
       });
     }
   }
@@ -151,10 +219,10 @@ export function validateFlagValue(
 
   if (mode === "diskspace") {
     if (raw.disk_space !== undefined) {
-      if (typeof raw.disk_space !== "number" || raw.disk_space <= 0) {
+      if (typeof raw.disk_space !== "number" || raw.disk_space <= 0 || raw.disk_space > MAX_DISK_SPACE_MB) {
         errors.push({
           field: `${mode}.disk_space`,
-          message: "must be a positive number (MB)",
+          message: `must be between 1 and ${MAX_DISK_SPACE_MB} (MB)`,
           value: raw.disk_space,
         });
       }
@@ -174,13 +242,22 @@ export function validateFlagValue(
         });
       } else {
         for (let i = 0; i < raw.deny_list.length; i++) {
+          const pattern = raw.deny_list[i] as string;
           try {
-            new RegExp(raw.deny_list[i] as string);
+            new RegExp(pattern);
           } catch {
             errors.push({
               field: `${mode}.deny_list[${i}]`,
               message: "invalid regular expression",
-              value: raw.deny_list[i],
+              value: pattern,
+            });
+            continue;
+          }
+          if (isUnsafeRegex(pattern)) {
+            errors.push({
+              field: `${mode}.deny_list[${i}]`,
+              message: "potentially unsafe pattern (nested quantifiers may cause excessive backtracking)",
+              value: pattern,
             });
           }
         }
@@ -261,6 +338,14 @@ export function validateFlagValue(
               message: "invalid regular expression",
               value: cond.value,
             });
+            continue;
+          }
+          if (isUnsafeRegex(cond.value)) {
+            errors.push({
+              field: `${mode}.match[${i}].value`,
+              message: "potentially unsafe pattern (nested quantifiers may cause excessive backtracking)",
+              value: cond.value,
+            });
           }
         }
       }
@@ -272,6 +357,13 @@ export function validateFlagValue(
 
 /** Parse raw JSON into FailureFlagsConfig. Validates each known flag key. */
 export function parseFlags(raw: Record<string, unknown>): FailureFlagsConfig {
+  if ("isEnabled" in raw || "failureMode" in raw) {
+    warn({
+      action: "config",
+      message: "detected 0.x configuration format — this version requires the v1.0 feature-flag format. See https://github.com/gunnargrosch/failure-lambda#migration-from-0x",
+    });
+  }
+
   const config: FailureFlagsConfig = {};
 
   for (const key of Object.keys(raw)) {
@@ -309,7 +401,7 @@ export function parseFlags(raw: Record<string, unknown>): FailureFlagsConfig {
 /**
  * Resolve enabled flags into an ordered array of failures to inject.
  * Order: latency, diskspace, denylist (non-terminating), then statuscode, exception (terminating).
- * Defaults rate to 1 when omitted.
+ * Defaults percentage to 100 when omitted.
  */
 export function resolveFailures(config: FailureFlagsConfig): ResolvedFailure[] {
   const failures: ResolvedFailure[] = [];
@@ -322,7 +414,7 @@ export function resolveFailures(config: FailureFlagsConfig): ResolvedFailure[] {
 
     failures.push({
       mode,
-      rate: Math.max(0, Math.min(1, flag.rate ?? 1)),
+      percentage: Math.max(0, Math.min(100, flag.percentage ?? 100)),
       flag,
     });
   }

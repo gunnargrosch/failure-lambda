@@ -35,7 +35,7 @@ describe("FAILURE_LAMBDA_DISABLED kill switch", () => {
     const handler = vi.fn().mockResolvedValue({ statusCode: 200 });
     const wrapped = injectFailure(handler, {
       configProvider: createConfigProvider({
-        exception: { enabled: true, rate: 1, exception_msg: "Should not throw" },
+        exception: { enabled: true, percentage: 100, exception_msg: "Should not throw" },
       }),
     });
 
@@ -50,7 +50,7 @@ describe("FAILURE_LAMBDA_DISABLED kill switch", () => {
     const handler = vi.fn();
     const wrapped = injectFailure(handler, {
       configProvider: createConfigProvider({
-        exception: { enabled: true, rate: 1, exception_msg: "Should throw" },
+        exception: { enabled: true, percentage: 100, exception_msg: "Should throw" },
       }),
     });
 
@@ -67,8 +67,8 @@ describe("dryRun option", () => {
     const wrapped = injectFailure(handler, {
       dryRun: true,
       configProvider: createConfigProvider({
-        exception: { enabled: true, rate: 1, exception_msg: "Should not throw" },
-        latency: { enabled: true, rate: 0.5, min_latency: 100, max_latency: 400 },
+        exception: { enabled: true, percentage: 100, exception_msg: "Should not throw" },
+        latency: { enabled: true, percentage: 50, min_latency: 100, max_latency: 400 },
       }),
     });
 
@@ -89,7 +89,7 @@ describe("dryRun option", () => {
     const wrapped = injectFailure(handler, {
       dryRun: true,
       configProvider: createConfigProvider({
-        corruption: { enabled: true, rate: 1, body: "corrupted" },
+        corruption: { enabled: true, percentage: 100, body: "corrupted" },
       }),
     });
 
@@ -140,13 +140,13 @@ describe("injectFailure wrapper", () => {
     });
   });
 
-  describe("per-flag rate rolling", () => {
-    it("should skip injection when random >= rate", async () => {
+  describe("per-flag percentage rolling", () => {
+    it("should skip injection when random roll >= percentage", async () => {
       vi.spyOn(Math, "random").mockReturnValue(0.9);
       const handler = vi.fn().mockResolvedValue({ statusCode: 200 });
       const wrapped = injectFailure(handler, {
         configProvider: createConfigProvider({
-          exception: { enabled: true, rate: 0.5, exception_msg: "Should not throw" },
+          exception: { enabled: true, percentage: 50, exception_msg: "Should not throw" },
         }),
       });
 
@@ -155,37 +155,37 @@ describe("injectFailure wrapper", () => {
       expect(handler).toHaveBeenCalled();
     });
 
-    it("should always inject when rate is 1", async () => {
+    it("should always inject when percentage is 100", async () => {
       vi.spyOn(Math, "random").mockReturnValue(0.99);
       const handler = vi.fn();
       const wrapped = injectFailure(handler, {
         configProvider: createConfigProvider({
-          exception: { enabled: true, rate: 1, exception_msg: "Always fail" },
+          exception: { enabled: true, percentage: 100, exception_msg: "Always fail" },
         }),
       });
 
       await expect(wrapped({}, mockContext, mockCallback)).rejects.toThrow("Always fail");
     });
 
-    it("should default rate to 1 when omitted", async () => {
+    it("should default percentage to 100 when omitted", async () => {
       vi.spyOn(Math, "random").mockReturnValue(0.99);
       const handler = vi.fn();
       const wrapped = injectFailure(handler, {
         configProvider: createConfigProvider({
-          exception: { enabled: true, exception_msg: "Default rate" },
+          exception: { enabled: true, exception_msg: "Default percentage" },
         }),
       });
 
-      await expect(wrapped({}, mockContext, mockCallback)).rejects.toThrow("Default rate");
+      await expect(wrapped({}, mockContext, mockCallback)).rejects.toThrow("Default percentage");
     });
 
-    it("should roll rate independently per flag", async () => {
+    it("should roll percentage independently per flag", async () => {
       let callCount = 0;
       vi.spyOn(Math, "random").mockImplementation(() => {
         callCount++;
-        // First call (latency, rate 1): return 0 → inject
+        // First call (latency, percentage 100): return 0 → inject (0 < 100)
         // Second call (latency random): return 0.5
-        // Third call (exception, rate 0.3): return 0.5 → skip (0.5 >= 0.3)
+        // Third call (exception, percentage 30): return 0.5 → skip (50 >= 30)
         return callCount <= 2 ? 0 : 0.5;
       });
 
@@ -193,8 +193,8 @@ describe("injectFailure wrapper", () => {
       const handler = vi.fn().mockResolvedValue({ statusCode: 200 });
       const wrapped = injectFailure(handler, {
         configProvider: createConfigProvider({
-          latency: { enabled: true, rate: 1, min_latency: 0, max_latency: 0 },
-          exception: { enabled: true, rate: 0.3, exception_msg: "Should not throw" },
+          latency: { enabled: true, percentage: 100, min_latency: 0, max_latency: 0 },
+          exception: { enabled: true, percentage: 30, exception_msg: "Should not throw" },
         }),
       });
 
@@ -212,7 +212,7 @@ describe("injectFailure wrapper", () => {
       const handler = vi.fn().mockResolvedValue({ statusCode: 200 });
       const wrapped = injectFailure(handler, {
         configProvider: createConfigProvider({
-          latency: { enabled: true, rate: 1, min_latency: 10, max_latency: 10 },
+          latency: { enabled: true, percentage: 100, min_latency: 10, max_latency: 10 },
         }),
       });
 
@@ -227,7 +227,7 @@ describe("injectFailure wrapper", () => {
       const handler = vi.fn();
       const wrapped = injectFailure(handler, {
         configProvider: createConfigProvider({
-          exception: { enabled: true, rate: 1, exception_msg: "Chaos!" },
+          exception: { enabled: true, percentage: 100, exception_msg: "Chaos!" },
         }),
       });
 
@@ -240,7 +240,7 @@ describe("injectFailure wrapper", () => {
       const handler = vi.fn();
       const wrapped = injectFailure(handler, {
         configProvider: createConfigProvider({
-          statuscode: { enabled: true, rate: 1, status_code: 503 },
+          statuscode: { enabled: true, percentage: 100, status_code: 503 },
         }),
       });
 
@@ -257,8 +257,8 @@ describe("injectFailure wrapper", () => {
       const handler = vi.fn().mockResolvedValue({ statusCode: 200 });
       const wrapped = injectFailure(handler, {
         configProvider: createConfigProvider({
-          latency: { enabled: true, rate: 1, min_latency: 0, max_latency: 0 },
-          diskspace: { enabled: true, rate: 1, disk_space: 50 },
+          latency: { enabled: true, percentage: 100, min_latency: 0, max_latency: 0 },
+          diskspace: { enabled: true, percentage: 100, disk_space: 50 },
         }),
       });
 
@@ -276,8 +276,8 @@ describe("injectFailure wrapper", () => {
       const handler = vi.fn();
       const wrapped = injectFailure(handler, {
         configProvider: createConfigProvider({
-          latency: { enabled: true, rate: 1, min_latency: 0, max_latency: 0 },
-          statuscode: { enabled: true, rate: 1, status_code: 503 },
+          latency: { enabled: true, percentage: 100, min_latency: 0, max_latency: 0 },
+          statuscode: { enabled: true, percentage: 100, status_code: 503 },
         }),
       });
 
@@ -296,8 +296,8 @@ describe("injectFailure wrapper", () => {
       const handler = vi.fn();
       const wrapped = injectFailure(handler, {
         configProvider: createConfigProvider({
-          latency: { enabled: true, rate: 1, min_latency: 0, max_latency: 0 },
-          exception: { enabled: true, rate: 1, exception_msg: "Boom" },
+          latency: { enabled: true, percentage: 100, min_latency: 0, max_latency: 0 },
+          exception: { enabled: true, percentage: 100, exception_msg: "Boom" },
         }),
       });
 
@@ -313,8 +313,8 @@ describe("injectFailure wrapper", () => {
       const handler = vi.fn();
       const wrapped = injectFailure(handler, {
         configProvider: createConfigProvider({
-          statuscode: { enabled: true, rate: 1, status_code: 418 },
-          exception: { enabled: true, rate: 1, exception_msg: "Should not reach" },
+          statuscode: { enabled: true, percentage: 100, status_code: 418 },
+          exception: { enabled: true, percentage: 100, exception_msg: "Should not reach" },
         }),
       });
 
@@ -349,7 +349,7 @@ describe("injectFailure wrapper", () => {
   describe("custom config provider", () => {
     it("should use the provided configProvider", async () => {
       const customConfig: FailureFlagsConfig = {
-        statuscode: { enabled: true, rate: 1, status_code: 418 },
+        statuscode: { enabled: true, percentage: 100, status_code: 418 },
       };
       vi.spyOn(Math, "random").mockReturnValue(0);
 
@@ -373,7 +373,7 @@ describe("injectFailure wrapper", () => {
       const handler = vi.fn().mockResolvedValue({ statusCode: 200 });
       const wrapped = injectFailure(handler, {
         configProvider: createConfigProvider({
-          timeout: { enabled: true, rate: 1, timeout_buffer_ms: 500 },
+          timeout: { enabled: true, percentage: 100, timeout_buffer_ms: 500 },
         }),
       });
 
@@ -405,8 +405,8 @@ describe("injectFailure wrapper", () => {
       const handler = vi.fn().mockResolvedValue({ statusCode: 200 });
       const wrapped = injectFailure(handler, {
         configProvider: createConfigProvider({
-          latency: { enabled: true, rate: 1, min_latency: 1000, max_latency: 1000 },
-          timeout: { enabled: true, rate: 1, timeout_buffer_ms: 500 },
+          latency: { enabled: true, percentage: 100, min_latency: 1000, max_latency: 1000 },
+          timeout: { enabled: true, percentage: 100, timeout_buffer_ms: 500 },
         }),
       });
 
@@ -436,7 +436,7 @@ describe("injectFailure wrapper", () => {
       const handler = vi.fn().mockResolvedValue({ statusCode: 200, body: "original" });
       const wrapped = injectFailure(handler, {
         configProvider: createConfigProvider({
-          corruption: { enabled: true, rate: 1, body: '{"corrupted": true}' },
+          corruption: { enabled: true, percentage: 100, body: '{"corrupted": true}' },
         }),
       });
 
@@ -446,12 +446,12 @@ describe("injectFailure wrapper", () => {
       expect(result).toEqual({ statusCode: 200, body: '{"corrupted": true}' });
     });
 
-    it("should not corrupt when rate check fails", async () => {
+    it("should not corrupt when percentage check fails", async () => {
       vi.spyOn(Math, "random").mockReturnValue(0.9);
       const handler = vi.fn().mockResolvedValue({ statusCode: 200, body: "original" });
       const wrapped = injectFailure(handler, {
         configProvider: createConfigProvider({
-          corruption: { enabled: true, rate: 0.5, body: "corrupted" },
+          corruption: { enabled: true, percentage: 50, body: "corrupted" },
         }),
       });
 
@@ -468,8 +468,8 @@ describe("injectFailure wrapper", () => {
       const handler = vi.fn().mockResolvedValue({ statusCode: 200, body: "original" });
       const wrapped = injectFailure(handler, {
         configProvider: createConfigProvider({
-          latency: { enabled: true, rate: 1, min_latency: 0, max_latency: 0 },
-          corruption: { enabled: true, rate: 1, body: "corrupted" },
+          latency: { enabled: true, percentage: 100, min_latency: 0, max_latency: 0 },
+          corruption: { enabled: true, percentage: 100, body: "corrupted" },
         }),
       });
 
@@ -489,7 +489,7 @@ describe("injectFailure wrapper", () => {
         configProvider: createConfigProvider({
           exception: {
             enabled: true,
-            rate: 1,
+            percentage: 100,
             exception_msg: "Matched!",
             match: [{ path: "requestContext.http.method", value: "GET" }],
           },
@@ -507,7 +507,7 @@ describe("injectFailure wrapper", () => {
         configProvider: createConfigProvider({
           exception: {
             enabled: true,
-            rate: 1,
+            percentage: 100,
             exception_msg: "Should not throw",
             match: [{ path: "requestContext.http.method", value: "GET" }],
           },
@@ -525,7 +525,7 @@ describe("injectFailure wrapper", () => {
       const handler = vi.fn();
       const wrapped = injectFailure(handler, {
         configProvider: createConfigProvider({
-          exception: { enabled: true, rate: 1, exception_msg: "No match" },
+          exception: { enabled: true, percentage: 100, exception_msg: "No match" },
         }),
       });
 
@@ -541,7 +541,7 @@ describe("injectFailure wrapper", () => {
         configProvider: createConfigProvider({
           corruption: {
             enabled: true,
-            rate: 1,
+            percentage: 100,
             body: "corrupted",
             match: [{ path: "type", value: "api" }],
           },
@@ -565,7 +565,7 @@ describe("injectFailure wrapper", () => {
         configProvider: createConfigProvider({
           exception: {
             enabled: true,
-            rate: 1,
+            percentage: 100,
             exception_msg: "multi-match",
             match: [
               { path: "source", value: "api" },
