@@ -1,5 +1,4 @@
 import { parseArgs } from "node:util";
-import * as p from "@clack/prompts";
 import { resolveConfigSource, resolveRegion, readConfig, writeConfig, mergeFlag, sourceLabel } from "./cli/store.js";
 import type { ConfigSource } from "./cli/store.js";
 import { promptCommand, promptProfile, promptSaveProfile, promptEnableMode, promptDisableMode, promptConfirmCreate } from "./cli/prompts.js";
@@ -8,11 +7,18 @@ import { loadSettings, saveSettings } from "./cli/settings.js";
 
 declare const __CLI_VERSION__: string | undefined;
 
+let _clack: typeof import("@clack/prompts") | null = null;
+async function clack(): Promise<typeof import("@clack/prompts")> {
+  if (_clack === null) _clack = await import("@clack/prompts");
+  return _clack;
+}
+
 const HELP = `
 failure-lambda - Manage failure injection configuration
 
 Usage:
   failure-lambda status                Show current configuration
+  failure-lambda status --json         Output raw configuration as JSON
   failure-lambda enable [mode]         Enable a failure mode
   failure-lambda disable [mode]        Disable a failure mode
   failure-lambda disable --all         Disable all failure modes
@@ -38,6 +44,7 @@ Saved profiles are stored in ~/.failure-lambda.json.
 
 Options:
   --region <region>                    AWS region (overrides AWS_REGION env var)
+  --json                               Output raw JSON (with status command)
   --all                                Disable all modes (with disable command)
   --help                               Show this help
   --version                            Show version
@@ -61,6 +68,7 @@ async function main(): Promise<void> {
       env: { type: "string" },
       profile: { type: "string" },
       region: { type: "string" },
+      json: { type: "boolean", default: false },
       all: { type: "boolean", default: false },
       help: { type: "boolean", default: false },
       version: { type: "boolean", default: false },
@@ -86,6 +94,7 @@ async function main(): Promise<void> {
     return;
   }
 
+  const p = await clack();
   p.intro("failure-lambda");
 
   const hasFlags = !!(values.param || (values.app && values.env && values.profile) || values.region);
@@ -107,7 +116,7 @@ async function main(): Promise<void> {
   }
 
   if (commandArg) {
-    await runCommand(commandArg, source, region, modeArg, values.all);
+    await runCommand(commandArg, source, region, { modeArg, disableAll: values.all, json: values.json });
     p.outro("Done");
     return;
   }
@@ -150,19 +159,31 @@ async function runCommand(
   command: string,
   source: ConfigSource,
   region: string,
-  modeArg?: string,
-  disableAll?: boolean,
+  opts: { modeArg?: string; disableAll?: boolean; json?: boolean } = {},
 ): Promise<void> {
+  const p = await clack();
   const spin = p.spinner();
 
   if (command === "status") {
     spin.start("Reading configuration...");
-    const { config, notFound } = await readConfig(source, region);
+    const { config, rawJson, notFound } = await readConfig(source, region);
     spin.stop("Configuration loaded");
+    if (opts.json) {
+      console.log(rawJson);
+      return;
+    }
     if (notFound) {
       p.log.warn(`${sourceLabel(source)} does not exist yet.`);
     }
-    displayStatus(config, source, region);
+    await displayStatus(config, source, region);
+    return;
+  }
+
+  if (command === "json") {
+    spin.start("Reading configuration...");
+    const { config } = await readConfig(source, region);
+    spin.stop("Configuration loaded");
+    await displayConfigPreview(config);
     return;
   }
 
@@ -176,10 +197,10 @@ async function runCommand(
       if (!create) return;
     }
 
-    const { mode, flag } = await promptEnableMode(currentConfig, modeArg);
+    const { mode, flag } = await promptEnableMode(currentConfig, opts.modeArg);
     const updatedConfig = mergeFlag(currentConfig, mode, flag);
 
-    displayConfigPreview(updatedConfig);
+    await displayConfigPreview(updatedConfig);
 
     spin.start(`Writing configuration to ${sourceLabel(source)}...`);
     await writeConfig(source, updatedConfig, region);
@@ -197,18 +218,19 @@ async function runCommand(
       return;
     }
 
-    const updatedConfig = await promptDisableMode(currentConfig, modeArg, disableAll);
+    const updatedConfig = await promptDisableMode(currentConfig, opts.modeArg, opts.disableAll);
 
-    displayConfigPreview(updatedConfig);
+    await displayConfigPreview(updatedConfig);
 
     spin.start(`Writing configuration to ${sourceLabel(source)}...`);
     await writeConfig(source, updatedConfig, region);
-    spin.stop(disableAll ? "All modes disabled" : `${modeArg ?? "Mode"} disabled`);
+    spin.stop(opts.disableAll ? "All modes disabled" : `${opts.modeArg ?? "Mode"} disabled`);
     return;
   }
 }
 
-main().catch((err: unknown) => {
+main().catch(async (err: unknown) => {
+  const p = await clack();
   p.cancel(err instanceof Error ? err.message : String(err));
   process.exitCode = 1;
 });

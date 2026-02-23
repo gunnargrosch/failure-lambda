@@ -1,12 +1,18 @@
-import * as p from "@clack/prompts";
 import { FAILURE_MODE_ORDER } from "../types.js";
 import type { FailureMode, FlagValue, FailureFlagsConfig, MatchCondition, MatchOperator } from "../types.js";
 import type { ConfigSource } from "./store.js";
 import { sourceLabel } from "./store.js";
 import type { SavedProfile, Settings } from "./settings.js";
 
+let _clack: typeof import("@clack/prompts") | null = null;
+async function clack(): Promise<typeof import("@clack/prompts")> {
+  if (_clack === null) _clack = await import("@clack/prompts");
+  return _clack;
+}
+
 /** Unwrap a prompt result, throwing on cancel so callers don't need to check every time */
-function unwrapOrCancel<T>(result: T | symbol): T {
+async function unwrapOrCancel<T>(result: T | symbol): Promise<T> {
+  const p = await clack();
   if (p.isCancel(result)) {
     p.cancel("Operation cancelled.");
     process.exit(0);
@@ -24,14 +30,16 @@ const MODE_DESCRIPTIONS: Record<FailureMode, string> = {
   corruption: "Replace the response body",
 };
 
-export type Command = "status" | "enable" | "disable" | "switch" | "exit";
+export type Command = "status" | "json" | "enable" | "disable" | "switch" | "exit";
 
 export async function promptCommand(): Promise<Command> {
-  return unwrapOrCancel(
+  const p = await clack();
+  return await unwrapOrCancel(
     await p.select({
       message: "What do you want to do?",
       options: [
         { value: "status" as const, label: "Status", hint: "Show current configuration" },
+        { value: "json" as const, label: "View JSON", hint: "Show raw configuration JSON" },
         { value: "enable" as const, label: "Enable", hint: "Enable a failure mode" },
         { value: "disable" as const, label: "Disable", hint: "Disable a failure mode" },
         { value: "switch" as const, label: "Switch configuration", hint: "Select a different saved profile" },
@@ -46,12 +54,13 @@ const NEW_CONFIG = "__new__" as const;
 export async function promptProfile(
   settings: Settings,
 ): Promise<SavedProfile | null> {
+  const p = await clack();
   const entries = Object.entries(settings.profiles);
   if (entries.length === 0) {
     return null;
   }
 
-  const choice = unwrapOrCancel(
+  const choice = await unwrapOrCancel(
     await p.select<string | typeof NEW_CONFIG>({
       message: "Select a saved configuration",
       options: [
@@ -76,7 +85,8 @@ export async function promptSaveProfile(
   profile: SavedProfile,
   settings: Settings,
 ): Promise<{ save: boolean; name?: string }> {
-  const save = unwrapOrCancel(
+  const p = await clack();
+  const save = await unwrapOrCancel(
     await p.confirm({
       message: "Save this configuration for next time?",
       initialValue: true,
@@ -92,7 +102,7 @@ export async function promptSaveProfile(
     ? `ssm-${profile.source.parameterName.split("/").filter(Boolean).join("-")}`
     : `appconfig-${profile.source.applicationId}`;
 
-  const name = unwrapOrCancel(
+  const name = await unwrapOrCancel(
     await p.text({
       message: "Profile name",
       defaultValue: defaultName,
@@ -109,7 +119,8 @@ export async function promptSaveProfile(
 }
 
 export async function promptConfirmCreate(label: string): Promise<boolean> {
-  return unwrapOrCancel(
+  const p = await clack();
+  return await unwrapOrCancel(
     await p.confirm({
       message: `${label} does not exist. Create it?`,
       initialValue: true,
@@ -118,7 +129,8 @@ export async function promptConfirmCreate(label: string): Promise<boolean> {
 }
 
 export async function promptRegion(): Promise<string> {
-  const region = unwrapOrCancel(
+  const p = await clack();
+  const region = await unwrapOrCancel(
     await p.text({
       message: "AWS region",
       defaultValue: "eu-north-1",
@@ -129,7 +141,8 @@ export async function promptRegion(): Promise<string> {
 }
 
 export async function promptConfigSource(): Promise<ConfigSource> {
-  const sourceType = unwrapOrCancel(
+  const p = await clack();
+  const sourceType = await unwrapOrCancel(
     await p.select({
       message: "Where is your failure-lambda configuration stored?",
       options: [
@@ -140,7 +153,7 @@ export async function promptConfigSource(): Promise<ConfigSource> {
   );
 
   if (sourceType === "ssm") {
-    const parameterName = unwrapOrCancel(
+    const parameterName = await unwrapOrCancel(
       await p.text({
         message: "SSM parameter name",
         placeholder: "/my-app/failure-config",
@@ -153,7 +166,7 @@ export async function promptConfigSource(): Promise<ConfigSource> {
     return { type: "ssm", parameterName };
   }
 
-  const applicationId = unwrapOrCancel(
+  const applicationId = await unwrapOrCancel(
     await p.text({
       message: "AppConfig application ID",
       validate: (value) => {
@@ -163,7 +176,7 @@ export async function promptConfigSource(): Promise<ConfigSource> {
     }),
   );
 
-  const environmentId = unwrapOrCancel(
+  const environmentId = await unwrapOrCancel(
     await p.text({
       message: "AppConfig environment ID",
       validate: (value) => {
@@ -173,7 +186,7 @@ export async function promptConfigSource(): Promise<ConfigSource> {
     }),
   );
 
-  const configurationProfileId = unwrapOrCancel(
+  const configurationProfileId = await unwrapOrCancel(
     await p.text({
       message: "AppConfig configuration profile ID",
       validate: (value) => {
@@ -190,6 +203,7 @@ export async function promptEnableMode(
   currentConfig: FailureFlagsConfig,
   requestedMode?: string,
 ): Promise<{ mode: FailureMode; flag: FlagValue }> {
+  const p = await clack();
   let mode: FailureMode;
 
   if (requestedMode) {
@@ -200,7 +214,7 @@ export async function promptEnableMode(
     }
     mode = requestedMode as FailureMode;
   } else {
-    mode = unwrapOrCancel(
+    mode = await unwrapOrCancel(
       await p.select({
         message: "Which failure mode do you want to enable?",
         options: FAILURE_MODE_ORDER.map((m) => ({
@@ -214,7 +228,7 @@ export async function promptEnableMode(
 
   const currentFlag = currentConfig[mode];
 
-  const percentageStr = unwrapOrCancel(
+  const percentageStr = await unwrapOrCancel(
     await p.text({
       message: "Injection percentage (0 to 100)",
       defaultValue: String(currentFlag?.percentage ?? 100),
@@ -232,7 +246,7 @@ export async function promptEnableMode(
   const flag: FlagValue = { enabled: true, percentage };
   await promptModeSpecificParams(mode, flag, currentFlag);
 
-  const addMatch = unwrapOrCancel(
+  const addMatch = await unwrapOrCancel(
     await p.confirm({
       message: "Add event-based match conditions?",
       initialValue: false,
@@ -251,9 +265,10 @@ async function promptModeSpecificParams(
   flag: FlagValue,
   current?: FlagValue,
 ): Promise<void> {
+  const p = await clack();
   switch (mode) {
     case "latency": {
-      const minStr = unwrapOrCancel(
+      const minStr = await unwrapOrCancel(
         await p.text({
           message: "Minimum latency (ms)",
           defaultValue: String(current?.min_latency ?? 100),
@@ -266,7 +281,7 @@ async function promptModeSpecificParams(
           },
         }),
       );
-      const maxStr = unwrapOrCancel(
+      const maxStr = await unwrapOrCancel(
         await p.text({
           message: "Maximum latency (ms)",
           defaultValue: String(current?.max_latency ?? 400),
@@ -284,7 +299,7 @@ async function promptModeSpecificParams(
       break;
     }
     case "timeout": {
-      const bufferStr = unwrapOrCancel(
+      const bufferStr = await unwrapOrCancel(
         await p.text({
           message: "Timeout buffer (ms before Lambda timeout)",
           defaultValue: String(current?.timeout_buffer_ms ?? 500),
@@ -301,7 +316,7 @@ async function promptModeSpecificParams(
       break;
     }
     case "diskspace": {
-      const sizeStr = unwrapOrCancel(
+      const sizeStr = await unwrapOrCancel(
         await p.text({
           message: "Disk space to fill (MB)",
           defaultValue: String(current?.disk_space ?? 100),
@@ -318,7 +333,7 @@ async function promptModeSpecificParams(
       break;
     }
     case "denylist": {
-      const patternsStr = unwrapOrCancel(
+      const patternsStr = await unwrapOrCancel(
         await p.text({
           message: "Deny list patterns (comma-separated regex)",
           defaultValue: current?.deny_list?.join(", ") ?? "s3.*.amazonaws.com, dynamodb.*.amazonaws.com",
@@ -329,7 +344,7 @@ async function promptModeSpecificParams(
       break;
     }
     case "statuscode": {
-      const codeStr = unwrapOrCancel(
+      const codeStr = await unwrapOrCancel(
         await p.text({
           message: "HTTP status code to return",
           defaultValue: String(current?.status_code ?? 404),
@@ -346,7 +361,7 @@ async function promptModeSpecificParams(
       break;
     }
     case "exception": {
-      const msg = unwrapOrCancel(
+      const msg = await unwrapOrCancel(
         await p.text({
           message: "Exception message",
           defaultValue: current?.exception_msg ?? "Injected exception",
@@ -357,7 +372,7 @@ async function promptModeSpecificParams(
       break;
     }
     case "corruption": {
-      const body = unwrapOrCancel(
+      const body = await unwrapOrCancel(
         await p.text({
           message: "Replacement response body (leave empty for default)",
           defaultValue: current?.body ?? "",
@@ -373,11 +388,12 @@ async function promptModeSpecificParams(
 }
 
 async function promptMatchConditions(): Promise<MatchCondition[]> {
+  const p = await clack();
   const conditions: MatchCondition[] = [];
 
   let addMore = true;
   while (addMore) {
-    const path = unwrapOrCancel(
+    const path = await unwrapOrCancel(
       await p.text({
         message: "Event path (dot-separated, e.g. requestContext.http.method)",
         validate: (v) => {
@@ -387,7 +403,7 @@ async function promptMatchConditions(): Promise<MatchCondition[]> {
       }),
     );
 
-    const operator = unwrapOrCancel(
+    const operator = await unwrapOrCancel(
       await p.select<MatchOperator>({
         message: "Match operator",
         options: [
@@ -402,7 +418,7 @@ async function promptMatchConditions(): Promise<MatchCondition[]> {
     const condition: MatchCondition = { path, operator };
 
     if (operator !== "exists") {
-      const value = unwrapOrCancel(
+      const value = await unwrapOrCancel(
         await p.text({
           message: "Expected value",
           validate: (v) => {
@@ -416,7 +432,7 @@ async function promptMatchConditions(): Promise<MatchCondition[]> {
 
     conditions.push(condition);
 
-    addMore = unwrapOrCancel(
+    addMore = await unwrapOrCancel(
       await p.confirm({
         message: "Add another match condition?",
         initialValue: false,
@@ -456,13 +472,14 @@ export async function promptDisableMode(
     return { ...currentConfig, [mode]: { ...flag, enabled: false } };
   }
 
+  const p = await clack();
   const enabledModes = FAILURE_MODE_ORDER.filter((m) => currentConfig[m]?.enabled);
   if (enabledModes.length === 0) {
     throw new Error("No modes are currently enabled.");
   }
 
   const ALL = "__all__" as const;
-  const choice = unwrapOrCancel(
+  const choice = await unwrapOrCancel(
     await p.select<FailureMode | typeof ALL>({
       message: "Which failure mode do you want to disable?",
       options: [

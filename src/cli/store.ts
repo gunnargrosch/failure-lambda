@@ -1,14 +1,4 @@
 import { SSMClient, GetParameterCommand, PutParameterCommand } from "@aws-sdk/client-ssm";
-import {
-  AppConfigClient,
-  CreateHostedConfigurationVersionCommand,
-  StartDeploymentCommand,
-} from "@aws-sdk/client-appconfig";
-import {
-  AppConfigDataClient,
-  StartConfigurationSessionCommand,
-  GetLatestConfigurationCommand,
-} from "@aws-sdk/client-appconfigdata";
 import { parseFlags, validateFlagValue } from "../config.js";
 import type { FailureFlagsConfig, FailureMode, FlagValue } from "../types.js";
 import { promptConfigSource, promptRegion } from "./prompts.js";
@@ -113,6 +103,8 @@ async function readFromAppConfig(
   source: Extract<ConfigSource, { type: "appconfig" }>,
   region: string,
 ): Promise<ReadConfigResult> {
+  const { AppConfigDataClient, StartConfigurationSessionCommand, GetLatestConfigurationCommand } =
+    await import("@aws-sdk/client-appconfigdata");
   const client = new AppConfigDataClient({ region });
 
   const session = await client.send(
@@ -158,6 +150,8 @@ async function writeToAppConfig(
   json: string,
   region: string,
 ): Promise<void> {
+  const { AppConfigClient, CreateHostedConfigurationVersionCommand, StartDeploymentCommand } =
+    await import("@aws-sdk/client-appconfig");
   const client = new AppConfigClient({ region });
 
   const versionResponse = await client.send(

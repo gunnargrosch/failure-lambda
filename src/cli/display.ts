@@ -1,8 +1,13 @@
-import * as p from "@clack/prompts";
 import { FAILURE_MODE_ORDER } from "../types.js";
 import type { FailureFlagsConfig, FailureMode, FlagValue } from "../types.js";
 import type { ConfigSource } from "./store.js";
 import { sourceLabel } from "./store.js";
+
+let _clack: typeof import("@clack/prompts") | null = null;
+async function clack(): Promise<typeof import("@clack/prompts")> {
+  if (_clack === null) _clack = await import("@clack/prompts");
+  return _clack;
+}
 
 function modeDetail(mode: FailureMode, flag: FlagValue): string {
   const parts: string[] = [`${flag.percentage ?? 100}%`];
@@ -43,7 +48,8 @@ function modeDetail(mode: FailureMode, flag: FlagValue): string {
   return parts.join(", ");
 }
 
-export function displayStatus(config: FailureFlagsConfig, source: ConfigSource, region: string): void {
+export async function displayStatus(config: FailureFlagsConfig, source: ConfigSource, region: string): Promise<void> {
+  const p = await clack();
   p.log.info(`Region: ${region}`);
   p.log.info(`Source: ${sourceLabel(source)}`);
 
@@ -64,7 +70,8 @@ export function displayStatus(config: FailureFlagsConfig, source: ConfigSource, 
   p.log.info(`${enabledCount} of ${FAILURE_MODE_ORDER.length} modes enabled`);
 }
 
-export function displayConfigPreview(config: FailureFlagsConfig): void {
+export async function displayConfigPreview(config: FailureFlagsConfig): Promise<void> {
+  const p = await clack();
   const json = JSON.stringify(config, null, 2);
   p.note(json, "Configuration preview");
 }
