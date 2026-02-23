@@ -512,9 +512,15 @@ Your handler code is completely unchanged — the proxy is transparent.
 
 ### Supported Runtimes
 
-nodejs18.x, nodejs20.x, nodejs22.x, python3.12, python3.13, java21, dotnet10, ruby3.4
+The layer works with all managed Lambda runtimes that support `AWS_LAMBDA_EXEC_WRAPPER`:
 
-Both x86_64 and arm64 architectures are supported. Any managed runtime that supports `AWS_LAMBDA_EXEC_WRAPPER` should work — the list above reflects what has been tested.
+- **Node.js:** nodejs24.x, nodejs22.x, nodejs20.x
+- **Python:** python3.14, python3.13, python3.12, python3.11, python3.10
+- **Java:** java25, java21, java17, java11, java8.al2
+- **.NET:** dotnet10, dotnet8
+- **Ruby:** ruby3.4, ruby3.3, ruby3.2
+
+Both x86_64 and arm64 architectures are supported.
 
 ### Setup
 
@@ -524,7 +530,6 @@ Both x86_64 and arm64 architectures are supported. Any managed runtime that supp
    aws lambda publish-layer-version \
      --layer-name failure-lambda \
      --zip-file fileb://failure-lambda-layer-aarch64.zip \
-     --compatible-runtimes nodejs20.x python3.13 java21 dotnet10 ruby3.4 \
      --compatible-architectures arm64 \
      --region eu-west-1
    ```
