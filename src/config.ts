@@ -483,7 +483,7 @@ export async function getConfig(): Promise<FailureFlagsConfig> {
       const cacheTtlMs = getCacheTtlMs();
       log({
         action: "config",
-        source,
+        config_source: source,
         cache_ttl_seconds: cacheTtlMs / 1000,
         enabled_flags: Object.keys(config).filter(
           (k) => (config as Record<string, { enabled?: boolean }>)[k]?.enabled,

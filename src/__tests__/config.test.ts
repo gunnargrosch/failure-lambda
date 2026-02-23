@@ -752,7 +752,7 @@ describe("config source logging", () => {
     await getConfig();
 
     expect(logSpy).toHaveBeenCalledWith(
-      expect.stringContaining('"source":"ssm"'),
+      expect.stringContaining('"config_source":"ssm"'),
     );
   });
 
@@ -769,7 +769,7 @@ describe("config source logging", () => {
     await getConfig();
 
     expect(logSpy).toHaveBeenCalledWith(
-      expect.stringContaining('"source":"appconfig"'),
+      expect.stringContaining('"config_source":"appconfig"'),
     );
     expect(logSpy).toHaveBeenCalledWith(
       expect.stringContaining('"action":"config"'),
@@ -805,7 +805,7 @@ describe("config source logging", () => {
     await getConfig();
 
     const sourceLogCalls = logSpy.mock.calls.filter(
-      (call) => typeof call[0] === "string" && call[0].includes('"source":"ssm"'),
+      (call) => typeof call[0] === "string" && call[0].includes('"config_source":"ssm"'),
     );
     expect(sourceLogCalls).toHaveLength(1);
   });
