@@ -4,45 +4,27 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [1.0.0] - 2026-02-22
+## [1.0.0] - 2026-02-23
 
 Rewritten in TypeScript with a feature flag configuration model.
 
 ### Added
 
 - TypeScript rewrite with full type definitions
-- Feature flag configuration model — each failure mode is an independent flag; multiple can be active simultaneously
+- Feature flag configuration model — each failure mode is an independent flag with its own `percentage`; multiple can be active simultaneously
 - `timeout` and `corruption` failure modes
-- Event-based targeting via `match` conditions with `eq`, `exists`, `startsWith`, and `regex` operators
-- Native AppConfig Feature Flags support with auto-disabled library cache (the extension already caches)
+- Event-based targeting via `match` conditions (`eq`, `exists`, `startsWith`, `regex`)
+- Native AppConfig Feature Flags support with auto-disabled library cache
 - Middy middleware via `failure-lambda/middy` subpath export
-- `FAILURE_LAMBDA_DISABLED` env var kill switch and `dryRun` option
-- `configProvider` option for custom config backends
-- Configuration validation with structured JSON logging, including ReDoS detection for regex patterns and a `disk_space` cap at Lambda's 10 GB `/tmp` limit
-- Exported `getConfig`, `validateFlagValue`, `resolveFailures`, `parseFlags`, and type definitions
-- CLI tool (`failure-lambda` command) for managing configuration interactively or via flags — supports `status`, `enable`, `disable`, and `disable --all` commands with SSM Parameter Store and AppConfig backends
-- Named CLI profiles saved to `~/.failure-lambda.json` for quick access to different configurations
-- Lambda Layer with Rust proxy for zero-code fault injection across any managed runtime (Node.js, Python, Java, .NET, Ruby) — deploy as a layer, set `AWS_LAMBDA_EXEC_WRAPPER`, no code changes required
-- DNS denylist interception via LD_PRELOAD shared library in the layer
-- Cross-architecture layer support (x86_64, arm64) with example SAM template
+- Configuration validation with structured JSON logging (ReDoS detection, range clamping, fail-closed on invalid flags)
+- CLI tool (`npx failure-lambda`) for managing configuration with saved profiles, SSM and AppConfig backends
+- Lambda Layer (x86_64, arm64) with Rust proxy for zero-code fault injection across any managed runtime — includes LD_PRELOAD DNS denylist interception
 
 ### Changed
 
 - AWS SDK v3, native `fetch()`, `dns.lookup` monkey-patching (replaces `aws-sdk` v2, `node-fetch`, `mitm`)
 - Dual CJS/ESM package output; minimum Node.js 18
 - Examples updated to Node.js 22, SDK v3; SAM example includes wrapper and Middy variants
-
-### Fixed
-
-- Invalid denylist regex patterns are caught and skipped instead of crashing
-- Diskspace `dd` errors logged; correct `* 1024` byte calculation for MB
-- Out-of-range `percentage` values clamped to `[0, 100]`
-- SAM example AppConfig layer ARN is now a parameter instead of a hardcoded region-specific ARN
-- SAM example esbuild configuration updated for correct ESM output
-- Skip `runPreHandlerInjections` when no failures are active, eliminating async overhead with AppConfig extension
-- Return well-formed API Gateway response from `statuscode` mode (avoids 502 errors)
-- Rename `source` to `config_source` in config log entry to avoid overwriting the top-level `source` field
-- Skip flags with any validation errors instead of partially applying them (fail-closed)
 
 ### Removed
 

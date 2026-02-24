@@ -9,7 +9,7 @@ vitest.config.ts
 .vscode/
 .claude/
 node_modules/
-example/
+examples/
 .github/
 coverage/
 layer/
