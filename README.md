@@ -149,7 +149,17 @@ FAILURE_INJECTION_PARAM=failureLambdaConfig
 
 ### 5. Create the SSM parameter
 
-Same command as [Path A, step 3](#3-create-the-ssm-parameter).
+```bash
+aws ssm put-parameter --region eu-west-1 --name failureLambdaConfig --type String --overwrite --value '{
+  "latency": {"enabled": false, "min_latency": 100, "max_latency": 400},
+  "exception": {"enabled": false, "exception_msg": "Exception message!"},
+  "statuscode": {"enabled": false, "status_code": 404},
+  "diskspace": {"enabled": false, "disk_space": 100},
+  "denylist": {"enabled": false, "deny_list": ["s3.*.amazonaws.com", "dynamodb.*.amazonaws.com"]},
+  "timeout": {"enabled": false, "timeout_buffer_ms": 500},
+  "corruption": {"enabled": false, "body": "{\"error\": \"corrupted\"}"}
+}'
+```
 
 ### 6. Add IAM permission
 
