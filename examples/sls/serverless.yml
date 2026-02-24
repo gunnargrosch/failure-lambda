@@ -1,5 +1,17 @@
 service: failureLambdaExample
-frameworkVersion: ">=3.0.0"
+frameworkVersion: "3"
+plugins:
+  - serverless-esbuild
+custom:
+  esbuild:
+    bundle: true
+    minify: false
+    target: node22
+    platform: node
+    format: esm
+    outputFileExtension: .mjs
+    external:
+      - "@aws-sdk/*"
 provider:
   name: aws
   runtime: nodejs22.x
@@ -58,6 +70,7 @@ resources:
             KeyType: HASH
         BillingMode: PAY_PER_REQUEST
 package:
+  individually: true
   exclude:
     - .vscode
     - .serverless

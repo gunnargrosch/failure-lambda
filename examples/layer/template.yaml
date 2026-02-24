@@ -1,0 +1,75 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  failure-lambda Layer example — zero-code fault injection with Node.js and Python handlers.
+  No failure-lambda import or dependency needed.
+
+Parameters:
+  FailureLambdaLayerArn:
+    Type: String
+    Description: >
+      ARN of the failure-lambda layer (from aws lambda publish-layer-version).
+      Download the zip from https://github.com/gunnargrosch/failure-lambda/releases/latest
+
+Resources:
+  FailureConfig:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Type: String
+      Value: '{}'
+
+  NodeFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: index.handler
+      Runtime: nodejs22.x
+      CodeUri: node/
+      Timeout: 30
+      MemorySize: 128
+      Layers:
+        - !Ref FailureLambdaLayerArn
+      Environment:
+        Variables:
+          AWS_LAMBDA_EXEC_WRAPPER: /opt/failure-lambda-wrapper
+          FAILURE_INJECTION_PARAM: !Ref FailureConfig
+      Policies:
+        - SSMParameterReadPolicy:
+            ParameterName: !Ref FailureConfig
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            Path: /node
+            Method: get
+
+  PythonFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: app.handler
+      Runtime: python3.13
+      CodeUri: python/
+      Timeout: 30
+      MemorySize: 128
+      Layers:
+        - !Ref FailureLambdaLayerArn
+      Environment:
+        Variables:
+          AWS_LAMBDA_EXEC_WRAPPER: /opt/failure-lambda-wrapper
+          FAILURE_INJECTION_PARAM: !Ref FailureConfig
+      Policies:
+        - SSMParameterReadPolicy:
+            ParameterName: !Ref FailureConfig
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            Path: /python
+            Method: get
+
+Outputs:
+  ApiUrl:
+    Description: API endpoint
+    Value: !Sub "https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com"
+  FailureConfigParameter:
+    Description: SSM parameter for failure configuration
+    Value: !Ref FailureConfig

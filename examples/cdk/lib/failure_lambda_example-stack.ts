@@ -1,3 +1,4 @@
+import * as path from "path";
 import { Stack, StackProps, RemovalPolicy } from "aws-cdk-lib";
 import { Construct } from "constructs";
 import * as lambda from "aws-cdk-lib/aws-lambda";
@@ -39,6 +40,7 @@ export class FailureLambdaExampleStack extends Stack {
       bundling: {
         nodeModules: ["failure-lambda"],
       },
+      depsLockFilePath: path.join(__dirname, "resources", "package-lock.json"),
     });
 
     new apigateway.LambdaRestApi(this, "failureLambdaApi", {

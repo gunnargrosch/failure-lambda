@@ -457,7 +457,7 @@ const failures = resolveFailures(config);
 
 ## Examples
 
-The `examples` directory contains sample applications with an AWS Lambda function, Amazon DynamoDB table, and SSM Parameter Store parameter. Deploy using AWS SAM, AWS CDK, or Serverless Framework.
+The `examples` directory contains sample applications. Deploy using AWS SAM, AWS CDK, or Serverless Framework.
 
 ### AWS SAM
 
@@ -494,6 +494,19 @@ cd examples/sls
 npm install
 sls deploy
 ```
+
+### Lambda Layer (SAM)
+
+A standalone SAM example with Node.js and Python handlers — no `failure-lambda` npm dependency needed:
+
+```bash
+cd examples/layer
+sam build
+sam deploy --guided --parameter-overrides \
+  FailureLambdaLayerArn=arn:aws:lambda:eu-west-1:123456789012:layer:failure-lambda:1
+```
+
+Pass the layer ARN from `aws lambda publish-layer-version` (see [Lambda Layer](#lambda-layer) setup). Use the zip matching your function architecture (x86_64 or arm64).
 
 ## Lambda Layer
 
