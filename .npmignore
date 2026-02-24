@@ -5,7 +5,7 @@ tsup.config.ts
 eslint.config.mjs
 vitest.config.ts
 .editorconfig
-.eslintrc.js
+tsconfig.test.json
 .vscode/
 .claude/
 node_modules/
