@@ -67,13 +67,13 @@ exports.handler = failureLambda(async (event, context) => {
 
 ```bash
 aws ssm put-parameter --region eu-west-1 --name failureLambdaConfig --type String --overwrite --value '{
-  "latency": {"enabled": false, "percentage": 100, "min_latency": 100, "max_latency": 400},
-  "exception": {"enabled": false, "percentage": 100, "exception_msg": "Exception message!"},
-  "statuscode": {"enabled": false, "percentage": 100, "status_code": 404},
-  "diskspace": {"enabled": false, "percentage": 100, "disk_space": 100},
-  "denylist": {"enabled": false, "percentage": 100, "deny_list": ["s3.*.amazonaws.com", "dynamodb.*.amazonaws.com"]},
-  "timeout": {"enabled": false, "percentage": 100, "timeout_buffer_ms": 500},
-  "corruption": {"enabled": false, "percentage": 100, "body": "{\"error\": \"corrupted\"}"}
+  "latency": {"enabled": false, "min_latency": 100, "max_latency": 400},
+  "exception": {"enabled": false, "exception_msg": "Exception message!"},
+  "statuscode": {"enabled": false, "status_code": 404},
+  "diskspace": {"enabled": false, "disk_space": 100},
+  "denylist": {"enabled": false, "deny_list": ["s3.*.amazonaws.com", "dynamodb.*.amazonaws.com"]},
+  "timeout": {"enabled": false, "timeout_buffer_ms": 500},
+  "corruption": {"enabled": false, "body": "{\"error\": \"corrupted\"}"}
 }'
 ```
 
@@ -267,11 +267,11 @@ Each failure mode is an independent feature flag. This format is used by both SS
 
 ```json
 {
-  "latency": { "enabled": true, "percentage": 100, "min_latency": 100, "max_latency": 400 },
+  "latency": { "enabled": false, "percentage": 100, "min_latency": 100, "max_latency": 400 },
   "exception": { "enabled": false, "percentage": 100, "exception_msg": "Exception message!" },
   "statuscode": { "enabled": false, "percentage": 100, "status_code": 404 },
   "diskspace": { "enabled": false, "percentage": 100, "disk_space": 100 },
-  "denylist": { "enabled": true, "percentage": 50, "deny_list": ["s3.*.amazonaws.com", "dynamodb.*.amazonaws.com"] },
+  "denylist": { "enabled": false, "percentage": 50, "deny_list": ["s3.*.amazonaws.com", "dynamodb.*.amazonaws.com"] },
   "timeout": { "enabled": false, "percentage": 100, "timeout_buffer_ms": 500 },
   "corruption": { "enabled": false, "percentage": 30, "body": "{\"error\": \"corrupted\"}" }
 }
