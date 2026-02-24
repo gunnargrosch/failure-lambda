@@ -40,7 +40,7 @@ Both paths support the same [failure modes](#failure-modes) and are controlled v
 npm install failure-lambda
 ```
 
-**Requirements:** Node.js >= 20 — Lambda runtimes `nodejs20.x`, `nodejs22.x`, or `nodejs24.x`.
+**Requirements:** Node.js >= 18 — Lambda runtimes `nodejs20.x`, `nodejs22.x`, or `nodejs24.x`.
 
 ### 2. Wrap your handler
 
@@ -81,7 +81,7 @@ aws ssm put-parameter --region eu-west-1 --name failureLambdaConfig --type Strin
 
 Add to your Lambda function:
 
-```
+```bash
 FAILURE_INJECTION_PARAM=failureLambdaConfig
 ```
 
@@ -142,7 +142,7 @@ Add the layer ARN returned by the previous command to your Lambda function's lay
 
 ### 4. Set the environment variables
 
-```
+```bash
 AWS_LAMBDA_EXEC_WRAPPER=/opt/failure-lambda-wrapper
 FAILURE_INJECTION_PARAM=failureLambdaConfig
 ```
@@ -358,12 +358,8 @@ Each condition supports an optional `operator` field (defaults to `"eq"`):
 
 Configuration is cached in memory to reduce latency and API calls. The cache persists within a single Lambda container and resets on cold starts.
 
-- **SSM Parameter Store:** Defaults to a 60-second cache TTL (configurable via `FAILURE_CACHE_TTL`).
+- **SSM Parameter Store:** Defaults to a 60-second cache TTL (configurable via `FAILURE_CACHE_TTL`). The parameter name must match `FAILURE_INJECTION_PARAM`.
 - **AppConfig:** Cache is **auto-disabled** (TTL defaults to 0) because the AppConfig Lambda extension already handles caching at its own poll interval (`AWS_APPCONFIG_EXTENSION_POLL_INTERVAL_SECONDS`, default 45s). Double-caching adds unnecessary staleness when updating configuration. You can override this by setting `FAILURE_CACHE_TTL` explicitly, but a warning will be logged.
-
-### SSM Parameter Store
-
-The SSM parameter setup command is included in both getting-started paths above. The parameter name must match the value of `FAILURE_INJECTION_PARAM`.
 
 ### AWS AppConfig Feature Flags
 
@@ -434,6 +430,8 @@ When run without a command, the CLI enters an interactive loop where you can run
 | `--version` | Show version |
 
 The same `FAILURE_INJECTION_PARAM` and `FAILURE_APPCONFIG_*` environment variables used by the library are also recognized by the CLI. If neither flags nor environment variables are set, the CLI prompts interactively.
+
+> **AppConfig writes:** When targeting AppConfig, `enable` and `disable` create a new hosted configuration version and deploy it immediately with `AllAtOnce`. Use the CLI for development and testing, not production rollouts.
 
 ### Saved Profiles
 
@@ -588,7 +586,7 @@ const failures = resolveFailures(config);
 
 ## Examples
 
-The `examples` directory contains sample applications with an AWS Lambda function, Amazon DynamoDB table, and SSM Parameter Store parameter. The SAM example is the most complete — it covers both SSM and AppConfig, and includes both a wrapper handler and a Middy middleware handler. Deploy using AWS SAM, AWS CDK, or Serverless Framework.
+The `examples` directory contains sample applications for deploying failure-lambda with different tools and runtimes. The SAM example is the most complete — it covers both SSM and AppConfig, and includes both a wrapper handler and a Middy middleware handler.
 
 ### Lambda Layer (SAM)
 
@@ -596,6 +594,7 @@ The `examples/layer/` directory contains a SAM template with example Node.js and
 
 ```bash
 cd examples/layer
+sam build
 sam deploy --guided --parameter-overrides FailureLambdaLayerArn=<your-layer-arn>
 ```
 
