@@ -592,12 +592,11 @@ The `examples` directory contains sample applications with an AWS Lambda functio
 
 ### Lambda Layer (SAM)
 
-The `layer/` directory contains a SAM template that deploys the layer and example Node.js and Python functions. Build the layer binaries first, then deploy:
+The `examples/layer/` directory contains a SAM template with example Node.js and Python functions. Download and publish the layer first following the [getting started steps](#getting-started-lambda-layer), then deploy passing in the layer ARN:
 
 ```bash
-cd layer
-./build.sh
-sam deploy --guided
+cd examples/layer
+sam deploy --guided --parameter-overrides FailureLambdaLayerArn=<your-layer-arn>
 ```
 
 ### AWS SAM
