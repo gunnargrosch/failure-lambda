@@ -40,7 +40,7 @@ Both paths support the same [failure modes](#failure-modes) and are controlled v
 npm install failure-lambda
 ```
 
-**Requirements:** Node.js >= 18 — Lambda runtimes `nodejs18.x`, `nodejs20.x`, `nodejs22.x`, or `nodejs24.x`.
+**Requirements:** Node.js >= 20 — Lambda runtimes `nodejs20.x`, `nodejs22.x`, or `nodejs24.x`.
 
 ### 2. Wrap your handler
 
