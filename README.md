@@ -682,13 +682,6 @@ The wrapper API is unchanged — `failureLambda(handler)` works exactly as befor
 
 Contributions are welcome. Please open an [issue](https://github.com/gunnargrosch/failure-lambda/issues) or submit a pull request.
 
-**Contributors:**
-
-- **Gunnar Grosch** — [GitHub](https://github.com/gunnargrosch) | [LinkedIn](https://www.linkedin.com/in/gunnargrosch/)
-- **Jason Barto** — [GitHub](https://github.com/jpbarto) | [LinkedIn](https://www.linkedin.com/in/jasonbarto)
-- **Daniel Reuter** — [GitHub](https://github.com/ReuDa)
-- **Norbert Schneider** — [GitHub](https://github.com/bertschneider)
-
 ## Acknowledgments
 
 Inspired by [Yan Cui's articles on latency injection for AWS Lambda](https://hackernoon.com/chaos-engineering-and-aws-lambda-latency-injection-ddeb4ff8d983) and [Adrian Hornsby's chaos injection library for Python](https://github.com/adhorn/aws-lambda-chaos-injection/).
