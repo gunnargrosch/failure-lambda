@@ -1,0 +1,18 @@
+{
+  "name": "failure-lambda-example",
+  "version": "1.0.0",
+  "description": "failure-lambda Serverless Framework example",
+  "type": "module",
+  "dependencies": {
+    "failure-lambda": "^1.0.0",
+    "@aws-sdk/client-dynamodb": "^3.600.0",
+    "@aws-sdk/lib-dynamodb": "^3.600.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "@types/aws-lambda": "^8.10.140",
+    "@types/node": "^22.0.0",
+    "serverless-esbuild": "^1.54.0",
+    "esbuild": "^0.24.0"
+  }
+}

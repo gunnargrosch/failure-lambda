@@ -1,0 +1,329 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Failure injection for AWS Lambda - failure-lambda example
+
+Globals:
+  Function:
+    Runtime: nodejs22.x
+    Timeout: 30
+    MemorySize: 128
+
+Parameters:
+  ConfigSource:
+    Type: String
+    Default: SSM
+    AllowedValues:
+      - SSM
+      - AppConfig
+    Description: Choose SSM Parameter Store or AppConfig Feature Flags as the config source
+  AppConfigExtensionLayerArn:
+    Type: String
+    Default: ""
+    Description: >-
+      ARN of the AWS AppConfig Lambda extension layer for your region and architecture.
+      Required when ConfigSource=AppConfig. Find your ARN at
+      https://docs.aws.amazon.com/appconfig/latest/userguide/appconfig-integration-lambda-extensions-versions.html
+
+Conditions:
+  UseSSM: !Equals [!Ref ConfigSource, SSM]
+  UseAppConfig: !Equals [!Ref ConfigSource, AppConfig]
+
+Resources:
+  # --- SSM resources (default) ---
+  failureLambdaParameter:
+    Type: AWS::SSM::Parameter
+    Condition: UseSSM
+    Properties:
+      Type: String
+      Value: >-
+        {
+          "latency": {"enabled": false, "percentage": 100, "min_latency": 100, "max_latency": 400},
+          "exception": {"enabled": false, "percentage": 100, "exception_msg": "Exception message!"},
+          "statuscode": {"enabled": false, "percentage": 100, "status_code": 404},
+          "diskspace": {"enabled": false, "percentage": 100, "disk_space": 100},
+          "denylist": {"enabled": false, "percentage": 100, "deny_list": ["s3.*.amazonaws.com", "dynamodb.*.amazonaws.com"]},
+          "timeout": {"enabled": false, "percentage": 100, "timeout_buffer_ms": 500},
+          "corruption": {"enabled": false, "percentage": 30, "body": "{\"error\": \"corrupted\"}", "match": [{"path": "requestContext.http.method", "value": "GET"}]}
+        }
+
+  # --- AppConfig resources ---
+  failureLambdaAppConfigApplication:
+    Type: AWS::AppConfig::Application
+    Condition: UseAppConfig
+    Properties:
+      Name: !Sub ${AWS::StackName}-failure-lambda
+
+  failureLambdaAppConfigEnvironment:
+    Type: AWS::AppConfig::Environment
+    Condition: UseAppConfig
+    Properties:
+      ApplicationId: !Ref failureLambdaAppConfigApplication
+      Name: default
+
+  failureLambdaAppConfigProfile:
+    Type: AWS::AppConfig::ConfigurationProfile
+    Condition: UseAppConfig
+    Properties:
+      ApplicationId: !Ref failureLambdaAppConfigApplication
+      Name: failure-flags
+      LocationUri: hosted
+      Type: AWS.AppConfig.FeatureFlags
+
+  failureLambdaAppConfigVersion:
+    Type: AWS::AppConfig::HostedConfigurationVersion
+    Condition: UseAppConfig
+    Properties:
+      ApplicationId: !Ref failureLambdaAppConfigApplication
+      ConfigurationProfileId: !Ref failureLambdaAppConfigProfile
+      ContentType: application/json
+      Content: |
+        {
+          "version": "1",
+          "flags": {
+            "latency": {
+              "name": "Latency Injection",
+              "attributes": {
+                "percentage": {"constraints": {"type": "number", "minimum": 0, "maximum": 100}},
+                "min_latency": {"constraints": {"type": "number", "minimum": 0, "required": true}},
+                "max_latency": {"constraints": {"type": "number", "minimum": 0, "required": true}}
+              }
+            },
+            "exception": {
+              "name": "Exception Injection",
+              "attributes": {
+                "percentage": {"constraints": {"type": "number", "minimum": 0, "maximum": 100}},
+                "exception_msg": {"constraints": {"type": "string", "required": true}}
+              }
+            },
+            "statuscode": {
+              "name": "Status Code Injection",
+              "attributes": {
+                "percentage": {"constraints": {"type": "number", "minimum": 0, "maximum": 100}},
+                "status_code": {"constraints": {"type": "number", "minimum": 100, "maximum": 599, "required": true}}
+              }
+            },
+            "diskspace": {
+              "name": "Disk Space Injection",
+              "attributes": {
+                "percentage": {"constraints": {"type": "number", "minimum": 0, "maximum": 100}},
+                "disk_space": {"constraints": {"type": "number", "minimum": 1, "required": true}}
+              }
+            },
+            "denylist": {
+              "name": "Denylist Injection",
+              "attributes": {
+                "percentage": {"constraints": {"type": "number", "minimum": 0, "maximum": 100}},
+                "deny_list": {"constraints": {"type": "array", "elements": {"type": "string"}, "required": true}}
+              }
+            },
+            "timeout": {
+              "name": "Timeout Injection",
+              "attributes": {
+                "percentage": {"constraints": {"type": "number", "minimum": 0, "maximum": 100}},
+                "timeout_buffer_ms": {"constraints": {"type": "number", "minimum": 0}}
+              }
+            },
+            "corruption": {
+              "name": "Response Corruption",
+              "attributes": {
+                "percentage": {"constraints": {"type": "number", "minimum": 0, "maximum": 100}},
+                "body": {"constraints": {"type": "string"}}
+              }
+            }
+          },
+          "values": {
+            "latency": {"enabled": false, "percentage": 100, "min_latency": 100, "max_latency": 400},
+            "exception": {"enabled": false, "percentage": 100, "exception_msg": "Exception message!"},
+            "statuscode": {"enabled": false, "percentage": 100, "status_code": 404},
+            "diskspace": {"enabled": false, "percentage": 100, "disk_space": 100},
+            "denylist": {"enabled": false, "percentage": 100, "deny_list": ["s3.*.amazonaws.com", "dynamodb.*.amazonaws.com"]},
+            "timeout": {"enabled": false, "percentage": 100, "timeout_buffer_ms": 500},
+            "corruption": {"enabled": false, "percentage": 30, "body": "{\"error\": \"corrupted\"}", "match": [{"path": "requestContext.http.method", "value": "GET"}]}
+          }
+        }
+
+  failureLambdaAppConfigDeployStrategy:
+    Type: AWS::AppConfig::DeploymentStrategy
+    Condition: UseAppConfig
+    Properties:
+      Name: !Sub ${AWS::StackName}-AllAtOnce
+      DeploymentDurationInMinutes: 0
+      GrowthFactor: 100
+      ReplicateTo: NONE
+      FinalBakeTimeInMinutes: 0
+
+  failureLambdaAppConfigDeployment:
+    Type: AWS::AppConfig::Deployment
+    Condition: UseAppConfig
+    Properties:
+      ApplicationId: !Ref failureLambdaAppConfigApplication
+      EnvironmentId: !Ref failureLambdaAppConfigEnvironment
+      ConfigurationProfileId: !Ref failureLambdaAppConfigProfile
+      ConfigurationVersion: !Ref failureLambdaAppConfigVersion
+      DeploymentStrategyId: !Ref failureLambdaAppConfigDeployStrategy
+
+  # --- Lambda function (wrapper) ---
+  failureLambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handler.handler
+      Policies:
+        - DynamoDBWritePolicy:
+            TableName: !Ref failureLambdaTable
+        - !If
+          - UseSSM
+          - SSMParameterReadPolicy:
+              ParameterName: !Ref failureLambdaParameter
+          - !Ref AWS::NoValue
+        - !If
+          - UseAppConfig
+          - Statement:
+              - Effect: Allow
+                Action:
+                  - appconfig:StartConfigurationSession
+                  - appconfig:GetLatestConfiguration
+                Resource: !Sub arn:aws:appconfig:${AWS::Region}:${AWS::AccountId}:application/${failureLambdaAppConfigApplication}/environment/${failureLambdaAppConfigEnvironment}/configuration/${failureLambdaAppConfigProfile}
+          - !Ref AWS::NoValue
+      Layers:
+        - !If
+          - UseAppConfig
+          - !Ref AppConfigExtensionLayerArn
+          - !Ref AWS::NoValue
+      Environment:
+        Variables:
+          FAILURE_INJECTION_TABLE: !Ref failureLambdaTable
+          FAILURE_INJECTION_PARAM: !If
+            - UseSSM
+            - !Ref failureLambdaParameter
+            - !Ref AWS::NoValue
+          FAILURE_APPCONFIG_APPLICATION: !If
+            - UseAppConfig
+            - !Ref failureLambdaAppConfigApplication
+            - !Ref AWS::NoValue
+          FAILURE_APPCONFIG_ENVIRONMENT: !If
+            - UseAppConfig
+            - !Ref failureLambdaAppConfigEnvironment
+            - !Ref AWS::NoValue
+          FAILURE_APPCONFIG_CONFIGURATION: !If
+            - UseAppConfig
+            - !Ref failureLambdaAppConfigProfile
+            - !Ref AWS::NoValue
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            Path: /
+            Method: GET
+            ApiId: !Ref failureLambdaApi
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Format: esm
+        Sourcemap: true
+        EntryPoints:
+          - handler.ts
+        OutExtension:
+          - .js=.mjs
+        Banner:
+          - 'js=import { createRequire } from "module"; const require = createRequire(import.meta.url);'
+        External:
+          - "@aws-sdk/*"
+
+  # --- Lambda function (Middy middleware) ---
+  failureLambdaMiddyFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handler-middy.handler
+      Policies:
+        - DynamoDBWritePolicy:
+            TableName: !Ref failureLambdaTable
+        - !If
+          - UseSSM
+          - SSMParameterReadPolicy:
+              ParameterName: !Ref failureLambdaParameter
+          - !Ref AWS::NoValue
+        - !If
+          - UseAppConfig
+          - Statement:
+              - Effect: Allow
+                Action:
+                  - appconfig:StartConfigurationSession
+                  - appconfig:GetLatestConfiguration
+                Resource: !Sub arn:aws:appconfig:${AWS::Region}:${AWS::AccountId}:application/${failureLambdaAppConfigApplication}/environment/${failureLambdaAppConfigEnvironment}/configuration/${failureLambdaAppConfigProfile}
+          - !Ref AWS::NoValue
+      Layers:
+        - !If
+          - UseAppConfig
+          - !Ref AppConfigExtensionLayerArn
+          - !Ref AWS::NoValue
+      Environment:
+        Variables:
+          FAILURE_INJECTION_TABLE: !Ref failureLambdaTable
+          FAILURE_INJECTION_PARAM: !If
+            - UseSSM
+            - !Ref failureLambdaParameter
+            - !Ref AWS::NoValue
+          FAILURE_APPCONFIG_APPLICATION: !If
+            - UseAppConfig
+            - !Ref failureLambdaAppConfigApplication
+            - !Ref AWS::NoValue
+          FAILURE_APPCONFIG_ENVIRONMENT: !If
+            - UseAppConfig
+            - !Ref failureLambdaAppConfigEnvironment
+            - !Ref AWS::NoValue
+          FAILURE_APPCONFIG_CONFIGURATION: !If
+            - UseAppConfig
+            - !Ref failureLambdaAppConfigProfile
+            - !Ref AWS::NoValue
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            Path: /middy
+            Method: GET
+            ApiId: !Ref failureLambdaApi
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Format: esm
+        Sourcemap: true
+        EntryPoints:
+          - handler-middy.ts
+        OutExtension:
+          - .js=.mjs
+        Banner:
+          - 'js=import { createRequire } from "module"; const require = createRequire(import.meta.url);'
+        External:
+          - "@aws-sdk/*"
+
+  failureLambdaApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      CorsConfiguration:
+        AllowMethods:
+          - GET
+        AllowHeaders:
+          - '*'
+        AllowOrigins: '*'
+
+  failureLambdaTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Delete
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: N
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+
+Outputs:
+  failureLambdaApiUrl:
+    Description: URL of your API endpoint
+    Value:
+      Fn::Sub: 'https://${failureLambdaApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}'

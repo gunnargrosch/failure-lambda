@@ -1,8 +1,0 @@
-{
-  "name": "failure-lambda-example",
-  "version": "0.1.0",
-  "description": "",
-  "dependencies": {
-    "failure-lambda": "0.4.4"
-  }
-}

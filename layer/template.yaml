@@ -1,0 +1,102 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: failure-lambda layer — chaos engineering for any Lambda runtime with zero code changes
+
+Parameters:
+  FailureInjectionParam:
+    Type: String
+    Default: /failure-lambda/config
+
+Resources:
+  FailureLambdaLayerX86:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: failure-lambda-x86-64
+      Description: failure-lambda chaos engineering proxy layer (x86_64)
+      ContentUri: dist/x86_64/
+      CompatibleRuntimes:
+        - nodejs24.x
+        - nodejs22.x
+        - nodejs20.x
+        - python3.14
+        - python3.13
+        - python3.12
+        - python3.11
+        - python3.10
+        - java25
+        - java21
+        - java17
+        - java11
+        - dotnet10
+        - dotnet8
+        - ruby3.4
+      CompatibleArchitectures:
+        - x86_64
+
+  FailureLambdaLayerArm64:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: failure-lambda-arm64
+      Description: failure-lambda chaos engineering proxy layer (arm64)
+      ContentUri: dist/aarch64/
+      CompatibleRuntimes:
+        - nodejs24.x
+        - nodejs22.x
+        - nodejs20.x
+        - python3.14
+        - python3.13
+        - python3.12
+        - python3.11
+        - python3.10
+        - java25
+        - java21
+        - java17
+        - java11
+        - dotnet10
+        - dotnet8
+        - ruby3.4
+      CompatibleArchitectures:
+        - arm64
+
+  # Example: Node.js function with the layer (no code changes needed)
+  ExampleNodeFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: index.handler
+      Runtime: nodejs20.x
+      CodeUri: examples/node/
+      Layers:
+        - !Ref FailureLambdaLayerX86
+      Environment:
+        Variables:
+          AWS_LAMBDA_EXEC_WRAPPER: /opt/failure-lambda-wrapper
+          FAILURE_INJECTION_PARAM: !Ref FailureInjectionParam
+      Policies:
+        - SSMParameterReadPolicy:
+            ParameterName: !Ref FailureInjectionParam
+
+  # Example: Python function with the layer (no code changes needed)
+  ExamplePythonFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: app.handler
+      Runtime: python3.12
+      CodeUri: examples/python/
+      Layers:
+        - !Ref FailureLambdaLayerX86
+      Environment:
+        Variables:
+          AWS_LAMBDA_EXEC_WRAPPER: /opt/failure-lambda-wrapper
+          FAILURE_INJECTION_PARAM: !Ref FailureInjectionParam
+      Policies:
+        - SSMParameterReadPolicy:
+            ParameterName: !Ref FailureInjectionParam
+
+Outputs:
+  LayerArnX86:
+    Description: Layer ARN for x86_64
+    Value: !Ref FailureLambdaLayerX86
+
+  LayerArnArm64:
+    Description: Layer ARN for arm64
+    Value: !Ref FailureLambdaLayerArm64

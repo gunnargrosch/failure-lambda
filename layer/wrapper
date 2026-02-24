@@ -1,0 +1,44 @@
+#!/bin/bash
+# /opt/failure-lambda-wrapper — set as AWS_LAMBDA_EXEC_WRAPPER
+
+# Save the real Runtime API endpoint for the proxy to read
+export _ORIGINAL_RUNTIME_API="$AWS_LAMBDA_RUNTIME_API"
+
+# Remove stale readiness file from a previous cold start. Without this,
+# Lambda environment reuse after a timeout-killed invocation would cause the
+# wrapper to see the old file and skip waiting for the new proxy instance.
+rm -f /tmp/.failure-lambda-ready
+
+# Start the proxy binary (reads config from env vars, no CLI args)
+/opt/failure-lambda-proxy &
+PROXY_PID=$!
+
+# Wait for proxy readiness via file signal (no curl dependency —
+# curl isn't guaranteed on minimal base images like provided.al2023)
+for i in $(seq 1 100); do
+  if [ -f /tmp/.failure-lambda-ready ]; then
+    break
+  fi
+  # If the proxy process died, fall through to real runtime without proxy.
+  # AWS_LAMBDA_RUNTIME_API hasn't been redirected yet at this point, so the
+  # runtime connects to the real endpoint directly.
+  if ! kill -0 $PROXY_PID 2>/dev/null; then
+    echo "failure-lambda-proxy exited unexpectedly" >&2
+    exec "$@"
+  fi
+  sleep 0.05
+done
+
+# Point the runtime at the proxy
+export AWS_LAMBDA_RUNTIME_API="127.0.0.1:${FAILURE_PROXY_PORT:-9009}"
+
+# Enable DNS denylist interception for the runtime process.
+# The .so intercepts getaddrinfo() and checks /tmp/.failure-lambda-denylist.
+# Only the runtime (and its children) get LD_PRELOAD — the proxy started
+# earlier without it, so its own DNS resolution is never affected.
+if [ -f /opt/failure-lambda-dns-intercept.so ]; then
+  export LD_PRELOAD="/opt/failure-lambda-dns-intercept.so${LD_PRELOAD:+:$LD_PRELOAD}"
+fi
+
+# Hand off to the real runtime
+exec "$@"

@@ -1,0 +1,76 @@
+service: failureLambdaExample
+frameworkVersion: "3"
+plugins:
+  - serverless-esbuild
+custom:
+  esbuild:
+    bundle: true
+    minify: false
+    target: node22
+    platform: node
+    format: esm
+    outputFileExtension: .mjs
+    external:
+      - "@aws-sdk/*"
+provider:
+  name: aws
+  runtime: nodejs22.x
+  memorySize: 128
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - ssm:GetParameters
+            - ssm:GetParameter
+          Resource:
+            Fn::Join:
+              - ''
+              - - 'arn:aws:ssm:${aws:region}:*:parameter/'
+                - Ref: failureLambdaParameter
+        - Effect: Allow
+          Action:
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+          Resource:
+            Fn::Join:
+              - ''
+              - - 'arn:aws:dynamodb:${aws:region}:*:table/'
+                - Ref: failureLambdaTable
+functions:
+  failureLambdaExample:
+    handler: handler.handler
+    timeout: 30
+    environment:
+      FAILURE_INJECTION_PARAM:
+        Ref: failureLambdaParameter
+      FAILURE_INJECTION_TABLE:
+        Ref: failureLambdaTable
+    events:
+      - http:
+          path: /
+          method: get
+          cors: true
+resources:
+  Resources:
+    failureLambdaParameter:
+      Type: 'AWS::SSM::Parameter'
+      Properties:
+        Type: String
+        Value: '{"latency": {"enabled": false, "percentage": 100, "min_latency": 100, "max_latency": 400}, "exception": {"enabled": false, "percentage": 100, "exception_msg": "Exception message!"}, "statuscode": {"enabled": false, "percentage": 100, "status_code": 404}, "diskspace": {"enabled": false, "percentage": 100, "disk_space": 100}, "denylist": {"enabled": false, "percentage": 100, "deny_list": ["s3.*.amazonaws.com", "dynamodb.*.amazonaws.com"]}, "timeout": {"enabled": false, "percentage": 100, "timeout_buffer_ms": 500}, "corruption": {"enabled": false, "percentage": 30, "body": "{\"error\": \"corrupted\"}", "match": [{"path": "requestContext.http.method", "value": "GET"}]}}'
+    failureLambdaTable:
+      Type: 'AWS::DynamoDB::Table'
+      DeletionPolicy: Delete
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: N
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+package:
+  individually: true
+  exclude:
+    - .vscode
+    - .serverless

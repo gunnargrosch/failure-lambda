@@ -3,7 +3,14 @@
 .vscode/
 .serverless/
 node_modules/
-example/.vscode/
-example/.serverless/
-example/node_modules/
+examples/.vscode/
+examples/.serverless/
+examples/node_modules/
 samconfig.toml
+.claude/
+dist/
+coverage/
+
+# Layer (Rust proxy)
+layer/proxy/target/
+layer/dist/

@@ -1,0 +1,9 @@
+[build.env]
+# Uncomment to use Finch instead of Docker:
+# CROSS_CONTAINER_ENGINE = "finch"
+
+[target.x86_64-unknown-linux-musl]
+image = "ghcr.io/cross-rs/x86_64-unknown-linux-musl:0.2.5"
+
+[target.aarch64-unknown-linux-musl]
+image = "ghcr.io/cross-rs/aarch64-unknown-linux-musl:0.2.5"
