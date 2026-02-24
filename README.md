@@ -590,6 +590,16 @@ const failures = resolveFailures(config);
 
 The `examples` directory contains sample applications with an AWS Lambda function, Amazon DynamoDB table, and SSM Parameter Store parameter. The SAM example is the most complete — it covers both SSM and AppConfig, and includes both a wrapper handler and a Middy middleware handler. Deploy using AWS SAM, AWS CDK, or Serverless Framework.
 
+### Lambda Layer (SAM)
+
+The `layer/` directory contains a SAM template that builds and publishes the layer itself, plus example Node.js and Python functions using it with zero code changes:
+
+```bash
+cd layer
+sam build
+sam deploy --guided
+```
+
 ### AWS SAM
 
 The SAM example supports both SSM and AppConfig via a `ConfigSource` parameter, and includes both a wrapper handler (`/`) and a Middy middleware handler (`/middy`):
