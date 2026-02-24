@@ -12,7 +12,7 @@ export default defineConfig([
     outDir: "dist",
     splitting: false,
     sourcemap: true,
-    target: "node18",
+    target: "node20",
     cjsInterop: true,
     esbuildOptions(options, context) {
       if (context.format === "cjs") {
@@ -30,7 +30,7 @@ export default defineConfig([
     dts: false,
     outDir: "dist",
     sourcemap: true,
-    target: "node18",
+    target: "node20",
     banner: { js: "#!/usr/bin/env node" },
     define: { __CLI_VERSION__: JSON.stringify(pkg.version) },
   },

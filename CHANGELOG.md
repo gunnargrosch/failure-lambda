@@ -23,13 +23,13 @@ Rewritten in TypeScript with a feature flag configuration model.
 ### Changed
 
 - AWS SDK v3, native `fetch()`, `dns.lookup` monkey-patching (replaces `aws-sdk` v2, `node-fetch`, `mitm`)
-- Dual CJS/ESM package output; minimum Node.js 18
+- Dual CJS/ESM package output; minimum Node.js 20
 - Examples updated to Node.js 22, SDK v3; SAM example includes wrapper and Middy variants
 
 ### Removed
 
 - `node-fetch` and `mitm` dependencies
-- Support for Node.js < 18
+- Support for Node.js < 20
 - Flat `{isEnabled, failureMode, ...}` configuration format (0.x)
 
 ## [0.4.4] - 2022-02-14

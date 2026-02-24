@@ -10,7 +10,7 @@ failure-lambda lets you inject faults into AWS Lambda functions to test how they
 
 | Path | Runtimes | How | When to use |
 |------|----------|-----|-------------|
-| [npm package](#getting-started-npm-package) | Node.js 18+ | Wrap handler or use Middy middleware | Programmatic control, Node.js only |
+| [npm package](#getting-started-npm-package) | Node.js 20+ | Wrap handler or use Middy middleware | Programmatic control, Node.js only |
 | [Lambda Layer](#getting-started-lambda-layer) | Any managed runtime | Add layer + 2 env vars | Zero code changes, any runtime |
 
 Both paths support the same [failure modes](#failure-modes) and are controlled via SSM Parameter Store or AppConfig.
@@ -40,7 +40,7 @@ Both paths support the same [failure modes](#failure-modes) and are controlled v
 npm install failure-lambda
 ```
 
-**Requirements:** Node.js >= 18 — Lambda runtimes `nodejs20.x`, `nodejs22.x`, or `nodejs24.x`.
+**Requirements:** Node.js >= 20 — Lambda runtimes `nodejs20.x`, `nodejs22.x`, or `nodejs24.x`.
 
 ### 2. Wrap your handler
 
@@ -638,7 +638,7 @@ sls deploy
 
 ### Breaking Changes
 
-- **Node.js 18+ required.** Lambda runtimes `nodejs14.x` and `nodejs16.x` are no longer supported.
+- **Node.js 20+ required.** Lambda runtimes `nodejs14.x`, `nodejs16.x`, and `nodejs18.x` are no longer supported.
 - **AWS SDK v3.** The library now uses `@aws-sdk/client-ssm` instead of `aws-sdk` v2. No user action needed — IAM permissions remain the same.
 - **`node-fetch` removed.** If your code depended on `node-fetch` being available transitively, install it separately.
 - **ESM-first package.** The package now ships as ESM with a CJS fallback. Both `import` and `require()` continue to work.
