@@ -75,14 +75,14 @@
     "@clack/prompts": "^1.0.1"
   },
   "devDependencies": {
-    "@eslint/js": "^9.0.0",
+    "@eslint/js": "^10.0.1",
     "@types/aws-lambda": "^8.10.140",
     "@types/node": "^22.0.0",
-    "@vitest/coverage-v8": "^2.1.0",
+    "@vitest/coverage-v8": "^4.0.18",
     "aws-sdk-client-mock": "^4.1.0",
     "tsup": "^8.5.0",
     "typescript": "^5.6.0",
-    "typescript-eslint": "^8.0.0",
-    "vitest": "^2.1.0"
+    "typescript-eslint": "^8.56.1",
+    "vitest": "^4.0.18"
   }
 }
