@@ -15,6 +15,8 @@ failure-lambda lets you inject faults into AWS Lambda functions to test how they
 
 Both paths support the same [failure modes](#failure-modes) and are controlled via SSM Parameter Store or AppConfig.
 
+Read the [blog post](https://dev.to/gunnargrosch/chaos-engineering-for-aws-lambda-failure-lambda-10-fpm) for a full walkthrough with examples.
+
 ## Table of Contents
 
 - [Getting Started: npm Package](#getting-started-npm-package)
