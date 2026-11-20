@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.3] - 2026-11-20
+
+### Fixed
+
+- Layer proxy: replaced the legacy rustls 0.21 connector with a rustls 0.23 ring connector, removing the vulnerable `rustls-webpki` 0.101.7 dependency
+
 ## [1.0.2] - 2026-11-20
 
 ### Fixed

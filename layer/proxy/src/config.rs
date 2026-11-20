@@ -151,7 +151,15 @@ impl ConfigManager {
         if let Some(ref client) = *guard {
             return client.clone();
         }
-        let sdk_config = aws_config::load_defaults(aws_config::BehaviorVersion::latest()).await;
+        let http_client = aws_smithy_http_client::Builder::new()
+            .tls_provider(aws_smithy_http_client::tls::Provider::Rustls(
+                aws_smithy_http_client::tls::rustls_provider::CryptoMode::Ring,
+            ))
+            .build_https();
+        let sdk_config = aws_config::defaults(aws_config::BehaviorVersion::latest())
+            .http_client(http_client)
+            .load()
+            .await;
         let client = aws_sdk_ssm::Client::new(&sdk_config);
         *guard = Some(client.clone());
         client
