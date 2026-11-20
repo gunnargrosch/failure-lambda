@@ -14,3 +14,7 @@ coverage/
 # Layer (Rust proxy)
 layer/proxy/target/
 layer/dist/
+
+# Python examples
+__pycache__/
+*.pyc

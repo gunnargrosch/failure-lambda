@@ -10,6 +10,11 @@ Parameters:
     Description: >
       ARN of the failure-lambda layer (from aws lambda publish-layer-version).
       Download the zip from https://github.com/gunnargrosch/failure-lambda/releases/latest
+  CacheTtl:
+    Type: String
+    Default: "60"
+    Description: >
+      Seconds to cache the failure configuration. Use 1 for demos.
 
 Resources:
   FailureConfig:
@@ -17,6 +22,17 @@ Resources:
     Properties:
       Type: String
       Value: '{}'
+
+  DemoTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
 
   NodeFunction:
     Type: AWS::Serverless::Function
@@ -32,9 +48,13 @@ Resources:
         Variables:
           AWS_LAMBDA_EXEC_WRAPPER: /opt/failure-lambda-wrapper
           FAILURE_INJECTION_PARAM: !Ref FailureConfig
+          FAILURE_CACHE_TTL: !Ref CacheTtl
+          TABLE_NAME: !Ref DemoTable
       Policies:
         - SSMParameterReadPolicy:
             ParameterName: !Ref FailureConfig
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DemoTable
       Events:
         Api:
           Type: HttpApi
@@ -56,9 +76,13 @@ Resources:
         Variables:
           AWS_LAMBDA_EXEC_WRAPPER: /opt/failure-lambda-wrapper
           FAILURE_INJECTION_PARAM: !Ref FailureConfig
+          FAILURE_CACHE_TTL: !Ref CacheTtl
+          TABLE_NAME: !Ref DemoTable
       Policies:
         - SSMParameterReadPolicy:
             ParameterName: !Ref FailureConfig
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DemoTable
       Events:
         Api:
           Type: HttpApi
@@ -73,3 +97,6 @@ Outputs:
   FailureConfigParameter:
     Description: SSM parameter for failure configuration
     Value: !Ref FailureConfig
+  DemoTableName:
+    Description: DynamoDB table used by the demo handlers
+    Value: !Ref DemoTable
