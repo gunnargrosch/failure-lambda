@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.2] - 2026-11-20
+
+### Fixed
+
+- Layer proxy: updated `aws-smithy-json` to 0.65.1 and `rustls-webpki` to 0.103.17, resolving the remaining high-severity dependency alerts
+- Examples: removed the vulnerable `fast-xml-builder` transitive dependency from the SAM and CDK resource lockfiles
+
 ## [1.0.1] - 2026-11-20
 
 ### Changed

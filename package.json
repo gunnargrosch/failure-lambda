@@ -1,6 +1,6 @@
 {
   "name": "failure-lambda",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Failure injection for AWS Lambda event functions - chaos engineering made simple",
   "type": "module",
   "main": "./dist/index.cjs",
