@@ -162,7 +162,7 @@ Resources:
       ConfigurationVersion: !Ref failureLambdaAppConfigVersion
       DeploymentStrategyId: !Ref failureLambdaAppConfigDeployStrategy
 
-  # --- Lambda function (wrapper) ---
+  # --- Lambda event function (wrapper) ---
   failureLambdaFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -231,7 +231,7 @@ Resources:
         External:
           - "@aws-sdk/*"
 
-  # --- Lambda function (Middy middleware) ---
+  # --- Lambda event function (Middy middleware) ---
   failureLambdaMiddyFunction:
     Type: AWS::Serverless::Function
     Properties:

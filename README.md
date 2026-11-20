@@ -6,11 +6,11 @@
 [![node](https://img.shields.io/node/v/failure-lambda.svg)](package.json)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue.svg)](https://www.typescriptlang.org/)
 
-failure-lambda lets you inject faults into AWS Lambda functions to test how they behave under real-world failure conditions.
+failure-lambda lets you inject faults into AWS Lambda event functions to test how they behave under real-world failure conditions.
 
 | Path | Runtimes | How | When to use |
 |------|----------|-----|-------------|
-| [npm package](#getting-started-npm-package) | Node.js 20+ | Wrap handler or use Middy middleware | Programmatic control, Node.js only |
+| [npm package](#getting-started-npm-package) | Node.js 20.12+ | Wrap handler or use Middy middleware | Programmatic control, Node.js only |
 | [Lambda Layer](#getting-started-lambda-layer) | Any managed runtime | Add layer + 2 env vars | Zero code changes, any runtime |
 
 Both paths support the same [failure modes](#failure-modes) and are controlled via SSM Parameter Store or AppConfig.
@@ -42,7 +42,7 @@ Read the [blog post](https://dev.to/gunnargrosch/chaos-engineering-for-aws-lambd
 npm install failure-lambda
 ```
 
-**Requirements:** Node.js >= 20 — Lambda runtimes `nodejs20.x`, `nodejs22.x`, or `nodejs24.x`.
+**Requirements:** Node.js >= 20.12 — Lambda runtimes `nodejs20.x`, `nodejs22.x`, or `nodejs24.x`.
 
 ### 2. Wrap your handler
 
@@ -81,7 +81,7 @@ aws ssm put-parameter --region eu-west-1 --name failureLambdaConfig --type Strin
 
 ### 4. Set the environment variable
 
-Add to your Lambda function:
+Add to your Lambda event function:
 
 ```bash
 FAILURE_INJECTION_PARAM=failureLambdaConfig
@@ -140,7 +140,7 @@ aws lambda publish-layer-version \
 
 ### 3. Add the layer to your function
 
-Add the layer ARN returned by the previous command to your Lambda function's layers.
+Add the layer ARN returned by the previous command to your Lambda event function's layers.
 
 ### 4. Set the environment variables
 
@@ -370,9 +370,9 @@ AppConfig provides deployment strategies and automatic rollback but requires mor
 1. Create an Application, Environment, and Configuration Profile (type: `AWS.AppConfig.FeatureFlags`) in the AppConfig console.
 2. Define flags for each failure mode (`latency`, `exception`, `statuscode`, `diskspace`, `denylist`, `timeout`, `corruption`) with their attributes.
 3. Deploy a version of the configuration.
-4. Add the [AWS AppConfig Lambda extension layer](https://docs.aws.amazon.com/appconfig/latest/userguide/appconfig-integration-lambda-extensions.html) to your Lambda function.
+4. Add the [AWS AppConfig Lambda extension layer](https://docs.aws.amazon.com/appconfig/latest/userguide/appconfig-integration-lambda-extensions.html) to your Lambda event function.
 5. Add environment variables: `FAILURE_APPCONFIG_APPLICATION`, `FAILURE_APPCONFIG_ENVIRONMENT`, and `FAILURE_APPCONFIG_CONFIGURATION` (see [Environment Variables](#environment-variables)).
-6. Add permissions for your Lambda function to access the AppConfig resources (`appconfig:StartConfigurationSession` and `appconfig:GetLatestConfiguration`).
+6. Add permissions for your Lambda event function to access the AppConfig resources (`appconfig:StartConfigurationSession` and `appconfig:GetLatestConfiguration`).
 
 The AppConfig extension returns the feature flags in the same JSON shape the library expects — no transformation needed.
 
@@ -640,7 +640,7 @@ sls deploy
 
 ### Breaking Changes
 
-- **Node.js 20+ required.** Lambda runtimes `nodejs14.x`, `nodejs16.x`, and `nodejs18.x` are no longer supported.
+- **Node.js 20.12+ required.** Lambda runtimes `nodejs14.x`, `nodejs16.x`, and `nodejs18.x` are no longer supported.
 - **AWS SDK v3.** The library now uses `@aws-sdk/client-ssm` instead of `aws-sdk` v2. No user action needed — IAM permissions remain the same.
 - **`node-fetch` removed.** If your code depended on `node-fetch` being available transitively, install it separately.
 - **ESM-first package.** The package now ships as ESM with a CJS fallback. Both `import` and `require()` continue to work.

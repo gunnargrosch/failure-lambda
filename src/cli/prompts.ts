@@ -10,8 +10,10 @@ async function clack(): Promise<typeof import("@clack/prompts")> {
   return _clack;
 }
 
+type CancelSymbol = typeof import("@clack/prompts").CANCEL_SYMBOL;
+
 /** Unwrap a prompt result, throwing on cancel so callers don't need to check every time */
-async function unwrapOrCancel<T>(result: T | symbol): Promise<T> {
+async function unwrapOrCancel<T>(result: T | CancelSymbol): Promise<T> {
   const p = await clack();
   if (p.isCancel(result)) {
     p.cancel("Operation cancelled.");

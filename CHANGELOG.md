@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.1] - 2026-11-20
+
+### Changed
+
+- Updated dependencies across the package and examples, including `@aws-sdk/*`, `@clack/prompts`, `vitest`, `aws-cdk-lib`, and transitive security fixes
+- Documentation now refers to Lambda event functions to distinguish them from Lambda web functions
+- Minimum Node.js version is now 20.12 (`@clack/prompts` 1.9 requires it for the CLI)
+
+### Fixed
+
+- Layer proxy: updated `quinn-proto` to 0.11.16, superseding the reverted 0.11.14 update
+- CLI: adapted prompt cancellation handling to the `@clack/prompts` 1.9 types
+
 ## [1.0.0] - 2026-02-23
 
 Rewritten in TypeScript with a feature flag configuration model.
